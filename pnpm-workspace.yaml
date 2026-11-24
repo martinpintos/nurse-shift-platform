@@ -14,5 +14,9 @@ catalog:
 
 # Dependency build scripts are opt-in. Allow only what needs them; deny the rest explicitly.
 allowBuilds:
-  # Its postinstall only re-validates the platform binary pnpm already installed.
+  # Downloads the schema engine that `prisma migrate` runs.
+  "@prisma/engines": true
+  # Only re-validates the platform binary pnpm already installed.
   esbuild: false
+  # Preinstall only checks the Node version (engines covers it).
+  prisma: false

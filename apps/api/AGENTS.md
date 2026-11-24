@@ -20,6 +20,10 @@ Nest has first-party packages for what this product needs, so check them before 
 
 - `src/main.ts` creates the app, applies `configureApp` and listens on `PORT` (3001 by default; the web app uses 3000).
 - `src/app.setup.ts` (`configureApp`) sets the global `/api` prefix and the `ErrorResponseFilter`, which turns every error into `{ "error": "<message>" }`. The e2e tests call it too, so never configure the app anywhere else.
-- `src/app.module.ts` is the root module that imports the others.
+- `src/app.module.ts` is the root module that imports the others. `src/config/env.ts` validates the environment at boot (see `.env.example`).
+- Database: Prisma 7 (no first-party Nest package). The schema is `prisma/schema.prisma` and the config `prisma.config.ts`. The client is generated into `src/generated/prisma` (gitignored; `pnpm exec prisma generate`) and injected as the global `PrismaService` (`@prisma/adapter-pg`). Import models and types from `../generated/prisma/client.js`.
+- Ids are plain strings: agencies and users only come from the seed with the spec's ids, and shift ids come from the database (`'shift-' || nextval('shift_id_seq')`). Migrations that touch `Shift.id` must keep that sequence.
+- Every route that returns a shift builds it with `toShiftDto` (`src/shifts/shift.mapper.ts`). It reads `@db.Date` in UTC, never local time.
+- `GET /api/health` is public by design. Every other route except login requires a token.
 - Unit tests sit beside the code as `*.spec.ts`; e2e tests are in `test/` as `*.e2e-spec.ts`. `pnpm test` runs both Vitest projects (`unit`, `e2e`); `pnpm test:e2e` runs only e2e.
 - Lint is oxlint with type-aware rules (`no-floating-promises` is an error).

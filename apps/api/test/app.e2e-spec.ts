@@ -23,6 +23,13 @@ describe("app (e2e)", () => {
     await app.close();
   });
 
+  it("reports health from the real database at /api/health", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/health")
+      .expect(200);
+    expect(response.body).toEqual({ status: "ok" });
+  });
+
   it("answers an unknown /api route with 404 and the { error } shape", async () => {
     const response = await request(app.getHttpServer())
       .get("/api/does-not-exist")

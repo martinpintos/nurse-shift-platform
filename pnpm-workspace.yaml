@@ -11,3 +11,8 @@ catalog:
   prisma: 7.10.1
   "@prisma/client": 7.10.1
   "@prisma/adapter-pg": 7.10.1
+
+# Dependency build scripts are opt-in. Allow only what needs them; deny the rest explicitly.
+allowBuilds:
+  # Its postinstall only re-validates the platform binary pnpm already installed.
+  esbuild: false

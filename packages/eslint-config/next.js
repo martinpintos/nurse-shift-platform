@@ -27,6 +27,13 @@ export const nextJsConfig = [
     },
   },
   {
+    // Config files (next.config.js etc.) run in Node, not the browser.
+    files: ["*.config.{js,mjs,cjs,ts,mts}"],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     plugins: {
       "@next/next": pluginNext,
     },

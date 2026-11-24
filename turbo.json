@@ -5,15 +5,23 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
-    },
-    "lint": {
-      "dependsOn": ["^lint"]
+      "env": ["API_URL"],
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": ["^build"]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "env": ["DATABASE_URL"],
+      "outputs": []
     },
     "dev": {
+      "dependsOn": ["^build"],
+      "env": ["API_URL", "DATABASE_URL", "PORT"],
       "cache": false,
       "persistent": true
     }

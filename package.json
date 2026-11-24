@@ -1,5 +1,5 @@
 {
-  "name": "nurse-shift-platform",
+  "name": "shiftpatch",
   "private": true,
   "scripts": {
     "build": "turbo run build",

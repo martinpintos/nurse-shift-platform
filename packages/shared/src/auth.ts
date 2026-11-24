@@ -29,3 +29,12 @@ export const LoginResponseSchema = z.strictObject({
   user: AuthUserSchema,
 });
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
+
+/**
+ * GET /api/auth/me 200 response: the signed-in user, plus the agency they act for.
+ * Agency logins use their agencyId as their user id (agency-a), per the spec's agency table.
+ */
+export const MeResponseSchema = AuthUserSchema.extend({
+  agencyId: IdSchema.nullable(),
+});
+export type MeResponse = z.infer<typeof MeResponseSchema>;

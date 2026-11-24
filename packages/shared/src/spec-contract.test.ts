@@ -12,6 +12,7 @@ import {
   IdSchema,
   LoginRequestSchema,
   LoginResponseSchema,
+  ROUTES,
   ShiftListResponseSchema,
   ShiftSchema,
   TEST_IDS,
@@ -102,7 +103,29 @@ describe("docs/spec.md contract", () => {
     const messages = new Set(
       [...spec.matchAll(/"error":\s*"([^"<]+)"/g)].map((match) => match[1]),
     );
-    expect([...messages].sort()).toEqual(Object.values(ERROR_MESSAGES).sort());
+    expect([...messages].sort()).toEqual(
+      [
+        ERROR_MESSAGES.invalidCredentials,
+        ERROR_MESSAGES.credentialExpired,
+      ].sort(),
+    );
+  });
+
+  it("flags exactly the spec's routes as spec routes in ROUTES", () => {
+    const specRoutes = ROUTES.filter((route) => route.spec).map(
+      (route) => `${route.method} ${route.path}`,
+    );
+    expect(specRoutes.sort()).toEqual(Object.keys(EXPECTED).sort());
+  });
+
+  it("requires a token on every route except login and health", () => {
+    const publicRoutes = ROUTES.filter(
+      (route) => route.access === "public",
+    ).map((route) => `${route.method} ${route.path}`);
+    expect(publicRoutes.sort()).toEqual([
+      "GET /api/health",
+      "POST /api/auth/login",
+    ]);
   });
 
   it("lists exactly the spec's login roles", () => {

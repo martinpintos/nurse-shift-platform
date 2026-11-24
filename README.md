@@ -43,6 +43,25 @@ pnpm turbo run check-types lint test
 
 API tests include e2e tests against a real database, so `DATABASE_URL` must be set (from `apps/api/.env`, or exported). CI runs the same loop plus `build`, against a Postgres 17 service, and scans the full git history with gitleaks.
 
+## API beyond the spec
+
+The six routes in [`docs/spec.md`](docs/spec.md) are unchanged. Every route, spec ones included, is listed with its access rules in [`packages/shared/src/routes.ts`](packages/shared/src/routes.ts), and the schemas live next to it in `@repo/shared`. Every route except login and health needs `Authorization: Bearer <token>`. Errors are always `{ "error": "<message>" }`, using the messages in `ERROR_MESSAGES`.
+
+| Route                              | Who                                           | What                                                                      |
+| ---------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------- |
+| `GET /api/health`                  | public                                        | `{ status: "ok" }`, 503 when the database is down                         |
+| `GET /api/auth/me`                 | any role                                      | the signed-in user and the agency they act for                            |
+| `POST /api/credentials`            | nurse                                         | multipart `file` (PDF, PNG or JPEG, 2 MB max) + `expiresOn` → 201         |
+| `GET /api/credentials`             | nurse (own), admin (all)                      | license documents with expiry status                                      |
+| `GET /api/credentials/:id/file`    | owner, admin                                  | the document, as an attachment                                            |
+| `GET /api/timesheets`              | nurse (own), agency (own shifts), admin (all) | timesheets                                                                |
+| `POST /api/timesheets`             | nurse, for her own filled claim               | actual start and end (overnight allowed) → 201                            |
+| `POST /api/timesheets/:id/approve` | agency, for its own shifts                    | approves a submitted timesheet                                            |
+| `GET /api/admin/shifts`            | admin                                         | the dashboard feed: shifts plus cancellation history and timesheet status |
+| `GET /api/admin/audit-log`         | admin                                         | every state change, newest first (`?limit=`, default 100)                 |
+| `GET /api/admin/outbox`            | admin                                         | the claim and cancellation notifications that would have been emailed     |
+| `POST /api/admin/reset`            | admin                                         | restores the spec's sample data                                           |
+
 ## Production
 
 | What          | URL                                                                                                        |
@@ -107,3 +126,8 @@ Product and engineering decisions, recorded as they are made.
 - **Railway start command is `pnpm --filter api start`.** The first deploy failed with `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT`: it ran `start:prod`, the Nest template's script name, which the scaffold had replaced with `start` (`node dist/main.js`).
 - **Railway settings live in `.railway/railway.ts`, not `railway.json`.** Railway deprecated `railway.json`/`railway.toml`: services without one can't opt in, and existing files stop being read on 2026-12-01. The file was imported with `railway config pull` (the plan showed no changes), and variables are left unmanaged, so no secret or connection string is in source. The import also widened the watch paths to the root files that change the API build. Before, a catalog bump or a security override in `pnpm-workspace.yaml` would not have redeployed the API.
 - **`pnpm verify` (and `/verify` in Claude Code) runs every gate before a commit.** It covers a frozen install, prettier, the production dependency audit, check-types, lint, test and build, applying migrations locally, and a schema drift check. `pnpm verify e2e` adds Playwright. It reads `apps/api/.env` without printing it. CI generates a random, masked `JWT_SECRET` per run, so no secret-looking value is committed.
+- **Every route except login and health requires a token**, including `GET /api/shifts`. `ROUTES` in `@repo/shared` encodes this, and the contract tests fail if a public route slips in.
+- **Routes beyond the spec are additive.** The six spec routes keep their exact shapes; everything else is in the table above, with strict response schemas in `@repo/shared`.
+- **Uploaded license documents are stored in Postgres** (`bytea`). They're transactional with the rest of the data, backed up with it, and need no extra service. PDF, PNG or JPEG only, checked by the file's magic bytes rather than the client's MIME type, and 2 MB max (well under Vercel's proxied request body limit). A Railway bucket is the next step if volume grows.
+- **Error messages beyond the spec are fixed strings** in `ERROR_MESSAGES`, shared by the API, the web banner and the tests. The spec's two messages are tested word for word against `docs/spec.md`.
+- **Timesheets record actual start and end times**; minutes worked are derived. An end before the start is an overnight shift, and equal times are rejected.

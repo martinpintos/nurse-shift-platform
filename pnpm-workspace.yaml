@@ -20,3 +20,8 @@ allowBuilds:
   esbuild: false
   # Preinstall only checks the Node version (engines covers it).
   prisma: false
+
+# Security overrides for transitive dependencies (see README "Decisions").
+overrides:
+  # @prisma/config 7.10.1 pins effect 3.20.0 (GHSA-7589-6fvf-x4pw, ReDoS); 3.22.1+ is patched.
+  effect: 3.22.5

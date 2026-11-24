@@ -47,9 +47,9 @@ API tests include e2e tests against a real database, so `DATABASE_URL` must be s
 
 | What          | URL                                                                                                        |
 | ------------- | ---------------------------------------------------------------------------------------------------------- |
-| Web (Vercel)  | https://shiftpatch-dev.vercel.app/                                                                         |
+| Web (Vercel)  | https://shiftpatch-demo.vercel.app/                                                                        |
 | API (Railway) | https://api-production-de40f62a.up.railway.app (also reachable as `/api/*` on the web URL via the rewrite) |
-| Health        | https://shiftpatch-dev.vercel.app/api/health                                                               |
+| Health        | https://shiftpatch-demo.vercel.app/api/health                                                              |
 
 Per-deployment Vercel URLs (`web-<hash>-….vercel.app`) sit behind Vercel Authentication. Use the production URL above for demos and checks.
 

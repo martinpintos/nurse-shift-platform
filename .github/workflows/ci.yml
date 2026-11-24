@@ -48,6 +48,13 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
 
+      - name: Generate a throwaway JWT secret
+        # Random per run and masked, so no secret-looking literal lives in git.
+        run: |
+          secret="$(openssl rand -base64 48)"
+          echo "::add-mask::${secret}"
+          echo "JWT_SECRET=${secret}" >> "${GITHUB_ENV}"
+
       - run: pnpm install --frozen-lockfile
 
       - name: Dependency audit

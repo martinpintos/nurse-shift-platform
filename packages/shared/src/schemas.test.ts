@@ -27,12 +27,16 @@ describe("IsoDateSchema", () => {
     expect(IsoDateSchema.safeParse(value).success).toBe(true);
   });
 
-  it.each(["2026-02-30", "2025-02-29", "2026-13-01", "2026-1-2", "02/10/2026", ""])(
-    "rejects %j",
-    (value) => {
-      expect(IsoDateSchema.safeParse(value).success).toBe(false);
-    },
-  );
+  it.each([
+    "2026-02-30",
+    "2025-02-29",
+    "2026-13-01",
+    "2026-1-2",
+    "02/10/2026",
+    "",
+  ])("rejects %j", (value) => {
+    expect(IsoDateSchema.safeParse(value).success).toBe(false);
+  });
 });
 
 describe("Time24hSchema", () => {
@@ -40,14 +44,22 @@ describe("Time24hSchema", () => {
     expect(Time24hSchema.safeParse(value).success).toBe(true);
   });
 
-  it.each(["24:00", "7:00", "07:60", "7pm", "07:00:00"])("rejects %j", (value) => {
-    expect(Time24hSchema.safeParse(value).success).toBe(false);
-  });
+  it.each(["24:00", "7:00", "07:60", "7pm", "07:00:00"])(
+    "rejects %j",
+    (value) => {
+      expect(Time24hSchema.safeParse(value).success).toBe(false);
+    },
+  );
 });
 
 describe("CreateShiftRequestSchema", () => {
   it("accepts an overnight shift on a past date", () => {
-    const body = { role: "RN", date: "2020-01-01", startTime: "19:00", endTime: "07:00" };
+    const body = {
+      role: "RN",
+      date: "2020-01-01",
+      startTime: "19:00",
+      endTime: "07:00",
+    };
     expect(CreateShiftRequestSchema.parse(body)).toEqual(body);
   });
 
@@ -63,7 +75,12 @@ describe("CreateShiftRequestSchema", () => {
   });
 
   it("rejects an unknown shift role", () => {
-    const body = { role: "Surgeon", date: "2026-10-05", startTime: "07:00", endTime: "19:00" };
+    const body = {
+      role: "Surgeon",
+      date: "2026-10-05",
+      startTime: "07:00",
+      endTime: "19:00",
+    };
     expect(CreateShiftRequestSchema.safeParse(body).success).toBe(false);
   });
 });
@@ -80,7 +97,9 @@ describe("CancelShiftRequestSchema", () => {
 
 describe("response schemas are strict", () => {
   it("rejects a shift with an extra field", () => {
-    expect(ShiftSchema.safeParse({ ...openShift, notes: "x" }).success).toBe(false);
+    expect(ShiftSchema.safeParse({ ...openShift, notes: "x" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects a shift missing claimedBy", () => {
@@ -95,11 +114,15 @@ describe("response schemas are strict", () => {
       cancellation: { reason: "advance", previousNurseId: "nurse-1" },
     };
     expect(CancelShiftResponseSchema.safeParse(response).success).toBe(true);
-    expect(CancelShiftResponseSchema.safeParse({ ...response, extra: 1 }).success).toBe(false);
+    expect(
+      CancelShiftResponseSchema.safeParse({ ...response, extra: 1 }).success,
+    ).toBe(false);
   });
 
   it("rejects an empty or extended error body", () => {
     expect(ErrorResponseSchema.safeParse({ error: "" }).success).toBe(false);
-    expect(ErrorResponseSchema.safeParse({ error: "x", statusCode: 400 }).success).toBe(false);
+    expect(
+      ErrorResponseSchema.safeParse({ error: "x", statusCode: 400 }).success,
+    ).toBe(false);
   });
 });

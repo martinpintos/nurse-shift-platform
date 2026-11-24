@@ -20,7 +20,10 @@ import {
 
 // Read the contract straight from docs/spec.md, so a spec change fails these tests
 // instead of silently drifting from the schemas.
-const spec = readFileSync(fileURLToPath(new URL("../../../docs/spec.md", import.meta.url)), "utf8");
+const spec = readFileSync(
+  fileURLToPath(new URL("../../../docs/spec.md", import.meta.url)),
+  "utf8",
+);
 
 function routeSections(markdown: string): Map<string, unknown[]> {
   const sections = new Map<string, unknown[]>();
@@ -43,15 +46,24 @@ function routeSections(markdown: string): Map<string, unknown[]> {
  */
 const AbbreviatedAgencyShiftListExample = z.strictObject({
   agencyId: IdSchema,
-  shifts: z.array(ShiftSchema.pick({ id: true, status: true, claimedBy: true })),
+  shifts: z.array(
+    ShiftSchema.pick({ id: true, status: true, claimedBy: true }),
+  ),
 });
 
 const EXPECTED: Record<string, z.ZodType[]> = {
-  "POST /api/auth/login": [LoginRequestSchema, LoginResponseSchema, ErrorResponseSchema],
+  "POST /api/auth/login": [
+    LoginRequestSchema,
+    LoginResponseSchema,
+    ErrorResponseSchema,
+  ],
   "GET /api/shifts": [ShiftListResponseSchema],
   "POST /api/shifts": [CreateShiftRequestSchema, ShiftSchema],
   "POST /api/shifts/:id/claim": [ShiftSchema, ErrorResponseSchema],
-  "POST /api/shifts/:id/cancel": [CancelShiftRequestSchema, CancelShiftResponseSchema],
+  "POST /api/shifts/:id/cancel": [
+    CancelShiftRequestSchema,
+    CancelShiftResponseSchema,
+  ],
   "GET /api/agencies/:agencyId/shifts": [
     AbbreviatedAgencyShiftListExample,
     AbbreviatedAgencyShiftListExample,
@@ -60,7 +72,9 @@ const EXPECTED: Record<string, z.ZodType[]> = {
 
 describe("docs/spec.md contract", () => {
   const sections = routeSections(spec);
-  const routes = [...sections.keys()].filter((route) => /^(GET|POST) \/api\//.test(route));
+  const routes = [...sections.keys()].filter((route) =>
+    /^(GET|POST) \/api\//.test(route),
+  );
 
   it("covers exactly the routes the spec defines", () => {
     expect(routes.sort()).toEqual(Object.keys(EXPECTED).sort());
@@ -79,7 +93,9 @@ describe("docs/spec.md contract", () => {
 
   it("requires full shifts in the agency list, not the abbreviated example", () => {
     const [agencyA] = sections.get("GET /api/agencies/:agencyId/shifts") ?? [];
-    expect(AgencyShiftListResponseSchema.safeParse(agencyA).success).toBe(false);
+    expect(AgencyShiftListResponseSchema.safeParse(agencyA).success).toBe(
+      false,
+    );
   });
 
   it("uses the spec's error messages word for word", () => {
@@ -97,7 +113,9 @@ describe("docs/spec.md contract", () => {
 
   it("lists exactly the spec's required test IDs", () => {
     const table = spec.slice(spec.indexOf("## Required test IDs"));
-    const ids = [...table.matchAll(/^\| `([a-z-]+)`/gm)].map((match) => match[1]);
+    const ids = [...table.matchAll(/^\| `([a-z-]+)`/gm)].map(
+      (match) => match[1],
+    );
     expect(ids).toHaveLength(15);
     expect(ids.sort()).toEqual(Object.values(TEST_IDS).sort());
   });

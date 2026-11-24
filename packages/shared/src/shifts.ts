@@ -70,4 +70,6 @@ export const AgencyShiftListResponseSchema = z.strictObject({
   agencyId: IdSchema,
   shifts: z.array(ShiftSchema),
 });
-export type AgencyShiftListResponse = z.infer<typeof AgencyShiftListResponseSchema>;
+export type AgencyShiftListResponse = z.infer<
+  typeof AgencyShiftListResponseSchema
+>;

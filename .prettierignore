@@ -1,0 +1,9 @@
+# Copied verbatim from the trial docs; must stay byte-identical.
+docs/
+CLAUDE.md
+ESCALATION.md
+# Managed by turbo.
+AGENTS.md
+# Generated
+pnpm-lock.yaml
+**/src/generated/

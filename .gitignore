@@ -42,3 +42,6 @@ apps/api/src/generated/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Claude Code: commit shared commands, keep personal settings local
+.claude/settings.local.json

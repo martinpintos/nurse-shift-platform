@@ -170,3 +170,8 @@ Product and engineering decisions, recorded as they are made.
 - **Shift dates are formatted in UTC**, so they never move a day. Audit and upload timestamps use the viewer's time zone.
 - **End-to-end tests use only the 15 test IDs**, like the automated checks. That covers sign-in, claim and refusal, cancel, post, the live admin badge, history, audit, outbox, timesheets and credential upload. The four automated-check rules each have their own test: auto-upload, valid post defaults, one-click cancel with each role's default reason (no dialog), and buttons only in the right state. A ~1.9 MB upload and a fake PDF also go through the Vercel proxy.
 - **The e2e suite can run against production** (`E2E_BASE_URL`). It resets the demo data per test and once at the end, leaving the spec's seed state.
+- **PostHog runs server-side only** (`posthog-node` in the API), so there's no browser SDK and session replay, autocapture and cookies are impossible.
+  - Events: `user_logged_in`, `shift_posted`, `shift_claimed`, `shift_claim_blocked`, `shift_cancelled`, `timesheet_submitted`, `timesheet_approved`, `credential_uploaded`, `licenses_exported`. Each fires only after its change commits.
+  - Each has a strict allow-list of ids, enum values and counts (`apps/api/src/analytics/analytics.events.ts`). An event with any other property is dropped, never sent.
+  - `distinct_id` is the user id; GeoIP is off and no person profiles are created. Names, emails, credential files and health data are never sent.
+  - Without `POSTHOG_KEY` (local, CI), analytics is off.

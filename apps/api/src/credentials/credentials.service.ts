@@ -1,3 +1,4 @@
+import { AnalyticsService } from "../analytics/analytics.service.js";
 import {
   BadRequestException,
   Inject,
@@ -62,9 +63,23 @@ export class CredentialsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(Clock) private readonly clock: Clock,
+    @Inject(AnalyticsService) private readonly analytics: AnalyticsService,
   ) {}
 
   async upload(
+    nurse: Principal,
+    file: UploadedLicense | undefined,
+    fields: CredentialUploadFields,
+  ): Promise<Credential> {
+    const credential = await this.uploadCommitted(nurse, file, fields);
+    this.analytics.capture("credential_uploaded", nurse.id, {
+      credential_id: credential.id,
+      status: credential.status,
+    });
+    return credential;
+  }
+
+  private async uploadCommitted(
     nurse: Principal,
     file: UploadedLicense | undefined,
     fields: CredentialUploadFields,

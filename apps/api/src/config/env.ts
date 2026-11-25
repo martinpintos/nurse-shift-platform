@@ -6,6 +6,11 @@ export const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   /** Signs login tokens (HS256). At least 32 characters, as HS256 needs a 32-byte key. */
   JWT_SECRET: z.string().min(32),
+  /** PostHog project key. Optional: without it, analytics is off. */
+  POSTHOG_KEY: z.string().min(1).optional(),
+  POSTHOG_HOST: z
+    .url({ protocol: /^https$/ })
+    .default("https://us.i.posthog.com"),
 });
 export type Env = z.infer<typeof EnvSchema>;
 

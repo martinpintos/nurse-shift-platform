@@ -1,3 +1,4 @@
+import { AnalyticsService } from "../analytics/analytics.service.js";
 import {
   HttpException,
   HttpStatus,
@@ -23,6 +24,7 @@ export class AuthService {
     @Inject(PasswordHasher) private readonly hasher: PasswordHasher,
     @Inject(TokenService) private readonly tokens: TokenService,
     @Inject(LoginThrottle) private readonly throttle: LoginThrottle,
+    @Inject(AnalyticsService) private readonly analytics: AnalyticsService,
   ) {}
 
   /**
@@ -54,6 +56,7 @@ export class AuthService {
       method: "password",
       claims: { role: user.role, agencyId: user.agencyId },
     });
+    this.analytics.capture("user_logged_in", user.id, { role: user.role });
     return {
       token: accessToken,
       user: { id: user.id, name: user.name, role: user.role },

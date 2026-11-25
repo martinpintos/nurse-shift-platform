@@ -1,3 +1,4 @@
+import { AnalyticsService } from "../analytics/analytics.service.js";
 import {
   ConflictException,
   ForbiddenException,
@@ -51,6 +52,7 @@ export class TimesheetsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(Clock) private readonly clock: Clock,
+    @Inject(AnalyticsService) private readonly analytics: AnalyticsService,
   ) {}
 
   /** A nurse's own; an agency's for its own shifts; the admin's, all. Newest first. */
@@ -71,6 +73,28 @@ export class TimesheetsService {
 
   /** A nurse submits actual hours for a shift she holds the claim on, once. */
   async submit(
+    nurse: Principal,
+    body: SubmitTimesheetRequest,
+  ): Promise<Timesheet> {
+    const timesheet = await this.submitCommitted(nurse, body);
+    this.analytics.capture("timesheet_submitted", nurse.id, {
+      timesheet_id: timesheet.id,
+      shift_id: timesheet.shiftId,
+    });
+    return timesheet;
+  }
+
+  /** An agency approves a submitted timesheet on one of its own shifts. */
+  async approve(principal: Principal, id: string): Promise<Timesheet> {
+    const timesheet = await this.approveCommitted(principal, id);
+    this.analytics.capture("timesheet_approved", principal.id, {
+      timesheet_id: timesheet.id,
+      shift_id: timesheet.shiftId,
+    });
+    return timesheet;
+  }
+
+  private async submitCommitted(
     nurse: Principal,
     body: SubmitTimesheetRequest,
   ): Promise<Timesheet> {
@@ -126,8 +150,10 @@ export class TimesheetsService {
     }
   }
 
-  /** An agency approves a submitted timesheet on one of its own shifts. */
-  async approve(principal: Principal, id: string): Promise<Timesheet> {
+  private async approveCommitted(
+    principal: Principal,
+    id: string,
+  ): Promise<Timesheet> {
     const agencyId = agencyOf(principal);
     return this.prisma.$transaction(async (tx) => {
       const timesheet = await tx.timesheet.findUnique({

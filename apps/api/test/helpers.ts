@@ -1,3 +1,4 @@
+import { AnalyticsService } from "../src/analytics/analytics.service.js";
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import {
@@ -48,12 +49,19 @@ export interface TestApp {
 }
 
 /** Boots the real app, as main.ts does, with a movable clock. */
-export async function createTestApp(): Promise<TestApp> {
+export async function createTestApp(
+  options: { analytics?: AnalyticsService } = {},
+): Promise<TestApp> {
   const clock = new TestClock();
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(Clock)
-    .useValue(clock)
-    .compile();
+    .useValue(clock);
+  if (options.analytics) {
+    builder = builder
+      .overrideProvider(AnalyticsService)
+      .useValue(options.analytics);
+  }
+  const moduleRef = await builder.compile();
   const app = configureApp(
     moduleRef.createNestApplication<INestApplication<App>>(),
   );

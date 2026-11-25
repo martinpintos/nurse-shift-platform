@@ -1,3 +1,4 @@
+import { AnalyticsService } from "../analytics/analytics.service.js";
 import {
   ConflictException,
   ForbiddenException,
@@ -43,7 +44,10 @@ export function agencyOf(principal: Principal): string {
 
 @Injectable()
 export class ShiftsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AnalyticsService) private readonly analytics: AnalyticsService,
+  ) {}
 
   /** Every shift, ordered by date, then numeric id. */
   async list(): Promise<ShiftListResponse> {
@@ -72,6 +76,58 @@ export class ShiftsService {
 
   /** Posts an open shift for the caller's own agency (never one named in the body). */
   async create(principal: Principal, body: CreateShiftRequest): Promise<Shift> {
+    const shift = await this.createCommitted(principal, body);
+    this.analytics.capture("shift_posted", principal.id, {
+      shift_id: shift.id,
+      agency_id: shift.agencyId,
+      shift_role: shift.role,
+    });
+    return shift;
+  }
+
+  /**
+   * A nurse claims an open shift. Analytics records the claim, or the credential block,
+   * after the transaction settles.
+   */
+  async claim(nurse: Principal, shiftId: string): Promise<Shift> {
+    try {
+      const shift = await this.claimCommitted(nurse, shiftId);
+      this.analytics.capture("shift_claimed", nurse.id, {
+        shift_id: shift.id,
+        agency_id: shift.agencyId,
+      });
+      return shift;
+    } catch (error) {
+      const blocked = claimBlockReason(error);
+      if (blocked) {
+        this.analytics.capture("shift_claim_blocked", nurse.id, {
+          shift_id: shiftId,
+          reason: blocked,
+        });
+      }
+      throw error;
+    }
+  }
+
+  async cancel(
+    principal: Principal,
+    shiftId: string,
+    reason: CancelReason,
+  ): Promise<CancelShiftResponse> {
+    const result = await this.cancelCommitted(principal, shiftId, reason);
+    this.analytics.capture("shift_cancelled", principal.id, {
+      shift_id: result.id,
+      agency_id: result.agencyId,
+      reason,
+      by_role: principal.role,
+    });
+    return result;
+  }
+
+  private async createCommitted(
+    principal: Principal,
+    body: CreateShiftRequest,
+  ): Promise<Shift> {
     const agencyId = agencyOf(principal);
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.shift.create({
@@ -99,7 +155,10 @@ export class ShiftsService {
    * date (not today: a past shift is checked against its own date). The claim itself is a
    * conditional update on `status = 'open'`, so of two concurrent claims exactly one wins.
    */
-  async claim(nurse: Principal, shiftId: string): Promise<Shift> {
+  private async claimCommitted(
+    nurse: Principal,
+    shiftId: string,
+  ): Promise<Shift> {
     return this.prisma.$transaction(async (tx) => {
       const shift = await tx.shift.findUnique({ where: { id: shiftId } });
       if (!shift) throw new NotFoundException(ERROR_MESSAGES.shiftNotFound);
@@ -152,7 +211,7 @@ export class ShiftsService {
    * advance only. Agencies cancel claims on their own shifts, for either reason. The admin
    * cancels any. A claim with a submitted or approved timesheet can't be cancelled.
    */
-  async cancel(
+  private async cancelCommitted(
     principal: Principal,
     shiftId: string,
     reason: CancelReason,
@@ -230,6 +289,17 @@ export class ShiftsService {
       return { ...reopened, cancellation: { reason, previousNurseId } };
     });
   }
+}
+
+/** The analytics reason when a claim was refused for the nurse's credential, else null. */
+function claimBlockReason(
+  error: unknown,
+): "credential_expired" | "no_credential" | null {
+  if (!(error instanceof ForbiddenException)) return null;
+  if (error.message === ERROR_MESSAGES.credentialExpired)
+    return "credential_expired";
+  if (error.message === ERROR_MESSAGES.noCredential) return "no_credential";
+  return null;
 }
 
 async function recipient(tx: Tx, userId: string): Promise<Recipient> {

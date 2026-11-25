@@ -144,3 +144,15 @@ Product and engineering decisions, recorded as they are made.
 - **Uploads:** stored file names are sanitized to `[A-Za-z0-9._-]` with the detected type's extension. An empty upload is a 400, a file over 2 MB a 413. Downloads are attachments with `nosniff` and `Cache-Control: private, no-store`. Credential status (valid or expired) is computed per response against today (UTC); claims still compare against the shift date.
 - **The admin asking for an unknown agency's shifts gets 200 with an empty list**, since the contract has no agency-not-found message. **The outbox lists the 200 newest messages**; the audit log defaults to 100 (max 500).
 - **`pnpm verify` applies migrations before running tests**, as CI does, so the API's e2e tests always see the current schema.
+- **Web session:** the token lives in `sessionStorage` only (per tab, cleared on sign-out or any 401), and `GET /api/auth/me` resolves the session on load. No cookies, so there is no CSRF surface.
+- **Web security headers:** `nosniff`, `strict-origin-when-cross-origin`, a Permissions-Policy denying camera, microphone and geolocation, `X-Frame-Options: DENY` and no `X-Powered-By`, plus a same-origin CSP in production (`'unsafe-inline'` for Next's inline bootstrap; no eval).
+- **Typed web client:** every response is parsed with its shared schema. A body that drifts from the contract shows "Unexpected response from the server" rather than rendering wrong data.
+- **One `notification-banner` for every action result**, success or error. It shows the API's message verbatim and stays until the next action's result replaces it. It is always in the DOM as a live region, so screen readers announce the first message. Load and poll failures show inline in their section, so polling never overwrites an action's result.
+- **Built for scripts that only know the 15 test IDs:**
+  - A credential uploads automatically once a file and an expiry date are set, with an Upload button as well. Auto-upload waits for a year of 2000 or later, so typing a year doesn't fire early.
+  - The post-shift form opens with valid defaults (RN, tomorrow, 07:00 to 19:00).
+  - `shift-cancel-button` cancels in one click, with the reason from an adjacent select: `advance` for nurses (`no-show` shown disabled), `no-show` for agency and admin.
+  - Claim buttons render only on open shifts, cancel buttons only on claimed ones.
+- **The nurse's Open shifts list (`shift-list-item`) shows open shifts only.** Her claims are under My shifts, with cancel and timesheet entry.
+- **The admin dashboard polls shifts, audit log, outbox and timesheets every 5 s**, pauses while the tab is hidden, and refreshes when it becomes visible.
+- **Shift dates are formatted in UTC**, so they never move a day. Audit and upload timestamps use the viewer's time zone.

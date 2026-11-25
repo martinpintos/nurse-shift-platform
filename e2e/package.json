@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "e2e": "playwright test",
+    "screens": "SCREENS=1 playwright test",
     "check-types": "tsc --noEmit",
     "lint": "eslint --max-warnings 0"
   },

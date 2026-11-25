@@ -36,12 +36,16 @@ export class AnalyticsService implements OnApplicationShutdown {
 
   constructor(@Inject(ConfigService) config: ConfigService<Env, true>) {
     const key = config.get("POSTHOG_KEY", { infer: true });
-    this.sink = key
-      ? new PostHog(key, {
-          host: config.get("POSTHOG_HOST", { infer: true }),
-          flushAt: 20,
-        })
-      : null;
+    if (!key) {
+      this.sink = null;
+      return;
+    }
+    const client = new PostHog(key, {
+      host: config.get("POSTHOG_HOST", { infer: true }),
+      flushAt: 20,
+    });
+    logDelivery(client, this.logger);
+    this.sink = client;
   }
 
   /** For tests: a service that records into `sink` instead of PostHog. */
@@ -93,4 +97,33 @@ export class AnalyticsService implements OnApplicationShutdown {
   async onApplicationShutdown(): Promise<void> {
     await this.sink?.shutdown();
   }
+}
+
+/** The part of posthog-node's client used to observe delivery. */
+export interface DeliveryEvents {
+  on(event: "flush" | "error", listener: (payload: unknown) => void): unknown;
+}
+
+/**
+ * Logs each batch sent to PostHog (a count and the event names, never their properties)
+ * and any delivery failure (its kind only). Sent lines with no failure warnings in the
+ * deployment's logs mean PostHog took the events: a failed or unconfirmed batch also
+ * raises an error, logged as "delivery failed".
+ */
+export function logDelivery(client: DeliveryEvents, logger: Logger): void {
+  client.on("flush", (messages) => {
+    const sent = Array.isArray(messages)
+      ? (messages as { event?: unknown }[])
+      : [];
+    const names = [
+      ...new Set(
+        sent.map((m) => (typeof m.event === "string" ? m.event : "?")),
+      ),
+    ];
+    logger.log(`PostHog sent ${sent.length} event(s): ${names.join(", ")}`);
+  });
+  client.on("error", (error) => {
+    const kind = error instanceof Error ? error.name : typeof error;
+    logger.warn(`PostHog delivery failed (${kind}); events may be lost`);
+  });
 }

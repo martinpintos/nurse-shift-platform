@@ -1,6 +1,11 @@
 import { ConfigService } from "@nestjs/config";
 import { Logger } from "@nestjs/common";
-import { AnalyticsService, type AnalyticsSink } from "./analytics.service.js";
+import {
+  AnalyticsService,
+  logDelivery,
+  type AnalyticsSink,
+  type DeliveryEvents,
+} from "./analytics.service.js";
 import { ANALYTICS_EVENTS } from "./analytics.events.js";
 
 function recordingSink() {
@@ -102,5 +107,35 @@ describe("AnalyticsService", () => {
         );
       }
     }
+  });
+
+  it("logs sent batches by count and event name only, and failures by kind", () => {
+    const listeners: Record<string, (payload: unknown) => void> = {};
+    const client: DeliveryEvents = {
+      on: (event, listener) => {
+        listeners[event] = listener;
+      },
+    };
+    const logger = new Logger("test");
+    const log = vi.spyOn(logger, "log").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    logDelivery(client, logger);
+
+    listeners["flush"]?.([
+      { event: "shift_claimed", properties: { shift_id: "shift-1" } },
+      { event: "shift_claimed", properties: { shift_id: "shift-3" } },
+      { event: "user_logged_in", properties: { role: "nurse" } },
+    ]);
+    expect(log).toHaveBeenCalledWith(
+      "PostHog sent 3 event(s): shift_claimed, user_logged_in",
+    );
+
+    listeners["error"]?.(
+      new TypeError("fetch failed: https://us.i.posthog.com"),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      "PostHog delivery failed (TypeError); events may be lost",
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain("shift-1");
   });
 });

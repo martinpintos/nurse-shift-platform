@@ -208,6 +208,18 @@ export function createApiClient(options: ApiClientOptions) {
       );
       return response.blob();
     },
+    /** Admin: the inspector's zip of every license document and compliance.csv. */
+    exportLicenses: async (): Promise<{ blob: Blob; fileName: string }> => {
+      const response = await send(routePath("/api/admin/exports/licenses"), {
+        method: "GET",
+        accept: "application/zip",
+      });
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const fileName =
+        /filename="([^"]+)"/.exec(disposition)?.[1] ??
+        "shiftpatch-licenses.zip";
+      return { blob: await response.blob(), fileName };
+    },
 
     listTimesheets: () =>
       get(routePath("/api/timesheets"), TimesheetListResponseSchema),

@@ -369,6 +369,22 @@ describe("contract: every route in ROUTES", () => {
           OutboxResponseSchema,
           200,
         ),
+      "GET /api/admin/exports/licenses": () =>
+        success(
+          t
+            .http()
+            .get("/api/admin/exports/licenses")
+            .set(bearer(tokens["admin-1"]))
+            .buffer(true)
+            .parse(binaryParser),
+          // A zip archive starts with the local file header "PK\x03\x04".
+          z
+            .instanceof(Buffer)
+            .refine(
+              (body) => body.subarray(0, 4).toString("hex") === "504b0304",
+            ),
+          200,
+        ),
       "POST /api/admin/reset": () =>
         success(
           t.http().post("/api/admin/reset").set(bearer(tokens["admin-1"])),

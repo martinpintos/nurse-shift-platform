@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "e2e"
 
 # One version per shared tool across the workspace (see README "Decisions").
 catalog:

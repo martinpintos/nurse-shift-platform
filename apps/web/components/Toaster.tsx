@@ -8,7 +8,7 @@ import { AlertCircleIcon, CheckCircleIcon, CloseIcon } from "./ui/icons";
 import styles from "./Toaster.module.css";
 
 /** How long a success toast stays, not counting time hovered or focused. */
-export const SUCCESS_TOAST_MS = 6000;
+export const SUCCESS_TOAST_MS = 10_000;
 const TOAST_EXIT_MS = 120;
 
 function ToastCard({

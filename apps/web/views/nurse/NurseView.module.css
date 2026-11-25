@@ -105,6 +105,13 @@
 .timeFields input {
   min-inline-size: 0;
   max-inline-size: 100%;
+  /* iOS WebKit adds padding outside the declared width of time inputs (bug 301648). */
+  padding: 0;
+  text-align: center;
+}
+
+.timeFields input::-webkit-datetime-edit {
+  margin-inline: var(--space-2);
 }
 
 .timesheetFooter,
@@ -178,9 +185,12 @@
   }
 
   .timeFields {
-    /* Keep room for native time controls and their gap, or put each on its own row. */
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr));
     max-width: 360px;
+  }
+
+  .timeFields input {
+    min-block-size: 44px;
   }
 
   .filters {

@@ -199,12 +199,20 @@ test("the nurse can read and use shift and license controls on a narrow screen",
   await expect(card.getByLabel("Actual end")).toBeVisible();
 
   await page.setViewportSize({ width: 384, height: 760 });
-  const [start, end] = await Promise.all([
-    card.getByLabel("Actual start").boundingBox(),
-    card.getByLabel("Actual end").boundingBox(),
+  const startTime = card.getByLabel("Actual start");
+  const endTime = card.getByLabel("Actual end");
+  const [start, end, bounds] = await Promise.all([
+    startTime.boundingBox(),
+    endTime.boundingBox(),
+    card.boundingBox(),
   ]);
-  expect(start).not.toBeNull();
-  expect(end?.y).toBeGreaterThanOrEqual(start!.y + start!.height + 16);
+  expect(end?.y).toBeCloseTo(start!.y);
+  expect(end!.x - (start!.x + start!.width)).toBeGreaterThanOrEqual(16);
+  expect(end!.x + end!.width).toBeLessThanOrEqual(
+    bounds!.x + bounds!.width - 16,
+  );
+  await expect(startTime).toHaveCSS("padding-inline-start", "0px");
+  await expect(endTime).toHaveCSS("padding-inline-end", "0px");
 
   await page.setViewportSize({ width: 320, height: 760 });
   const clipped = await card.evaluate((row) => {

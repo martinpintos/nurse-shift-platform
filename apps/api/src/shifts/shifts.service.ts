@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import {
   ERROR_MESSAGES,
+  type AgencyPeopleResponse,
   type AgencyShiftListResponse,
   type CancelReason,
   type CancelShiftResponse,
@@ -72,6 +73,22 @@ export class ShiftsService {
       orderBy: { date: "asc" },
     });
     return { agencyId, shifts: rows.map(toShiftDto).sort(compareShifts) };
+  }
+
+  /**
+   * Names of the nurses who hold or have held a claim on an agency's shifts, for the
+   * agency view (the spec route can't carry names). Own agency only; the admin may ask
+   * for any agency.
+   */
+  async peopleForAgency(
+    principal: Principal,
+    agencyId: string,
+  ): Promise<AgencyPeopleResponse> {
+    if (principal.role === "agency" && agencyOf(principal) !== agencyId) {
+      throw new ForbiddenException(ERROR_MESSAGES.notYourAgency);
+    }
+    // Placeholder until names are resolved (redesign step 2).
+    return { agencyId, people: {} };
   }
 
   /** Posts an open shift for the caller's own agency (never one named in the body). */

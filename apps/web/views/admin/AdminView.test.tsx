@@ -16,6 +16,7 @@ import {
   outboxMessage,
   shift2,
   submittedTimesheet,
+  refs,
 } from "../../test/fixtures";
 import { renderApp } from "../../test/render";
 import { POLL_INTERVAL_MS } from "../../lib/use-polling";
@@ -36,10 +37,10 @@ function renderAdmin(routes: Record<string, RouteHandler> = {}) {
     {
       user: admin,
       routes: {
-        "GET /api/admin/shifts": { shifts: adminShifts },
-        "GET /api/admin/audit-log": { entries: [auditEntry] },
-        "GET /api/admin/outbox": { messages: [outboxMessage] },
-        "GET /api/timesheets": { timesheets: [submittedTimesheet] },
+        "GET /api/admin/shifts": { shifts: adminShifts, refs },
+        "GET /api/admin/audit-log": { entries: [auditEntry], refs },
+        "GET /api/admin/outbox": { messages: [outboxMessage], refs },
+        "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
         ...routes,
       },
     },

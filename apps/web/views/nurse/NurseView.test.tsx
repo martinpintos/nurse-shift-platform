@@ -20,6 +20,7 @@ import {
   seedShifts,
   shift1,
   shift2,
+  refs,
 } from "../../test/fixtures";
 import { renderApp } from "../../test/render";
 import { NurseView } from "./NurseView";
@@ -41,7 +42,7 @@ function renderNurse(routes: Record<string, RouteHandler> = {}) {
       user: nurse,
       routes: {
         "GET /api/shifts": { shifts: [...seedShifts, takenByOther] },
-        "GET /api/timesheets": { timesheets: [] },
+        "GET /api/timesheets": { timesheets: [], refs },
         "GET /api/credentials": { credentials: [credential] },
         ...routes,
       },

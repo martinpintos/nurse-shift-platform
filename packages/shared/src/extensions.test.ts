@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  AdminShiftListResponseSchema,
   AdminShiftSchema,
+  AgencyPeopleResponseSchema,
   AuditLogEntrySchema,
+  AuditLogResponseSchema,
   AuditLogQuerySchema,
   CredentialSchema,
   CredentialUploadFieldsSchema,
@@ -9,14 +12,18 @@ import {
   MAX_CREDENTIAL_BYTES,
   MeResponseSchema,
   OutboxMessageSchema,
+  OutboxResponseSchema,
   ROUTES,
+  RefsSchema,
   ResetResponseSchema,
   SubmitTimesheetRequestSchema,
+  TimesheetListResponseSchema,
   TimesheetSchema,
   routePath,
   timesheetMinutes,
   type AdminShift,
   type Credential,
+  type Refs,
   type Timesheet,
 } from "./index.js";
 
@@ -211,6 +218,79 @@ describe("admin", () => {
     expect(ResetResponseSchema.parse({ status: "reset" })).toEqual({
       status: "reset",
     });
+  });
+});
+
+const refs: Refs = {
+  people: {
+    "nurse-1": { name: "Maria Lopez", role: "nurse" },
+    "agency-a": { name: "Sunrise Health Staffing", role: "agency" },
+  },
+  shifts: {
+    "shift-2": {
+      agencyId: "agency-a",
+      agencyName: "Sunrise Health Staffing",
+      role: "LPN",
+      date: "2026-10-03",
+      startTime: "07:00",
+      endTime: "19:00",
+    },
+  },
+};
+
+describe("refs", () => {
+  it("parses names for people and shifts", () => {
+    expect(RefsSchema.parse(refs)).toEqual(refs);
+  });
+
+  it("refuses anything beyond a name and role for a person", () => {
+    expect(
+      RefsSchema.safeParse({
+        ...refs,
+        people: {
+          "nurse-1": {
+            name: "Maria Lopez",
+            role: "nurse",
+            email: "maria.lopez@example.com",
+          },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("refuses extra shift fields, such as who claimed it", () => {
+    expect(
+      RefsSchema.safeParse({
+        ...refs,
+        shifts: {
+          "shift-2": { ...refs.shifts["shift-2"], claimedBy: "nurse-1" },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires refs on every response that shows names", () => {
+    const withoutRefs = [
+      [AdminShiftListResponseSchema, { shifts: [adminShift] }],
+      [AuditLogResponseSchema, { entries: [] }],
+      [OutboxResponseSchema, { messages: [] }],
+      [TimesheetListResponseSchema, { timesheets: [timesheet] }],
+    ] as const;
+    for (const [schema, body] of withoutRefs) {
+      expect(schema.safeParse(body).success).toBe(false);
+      expect(schema.safeParse({ ...body, refs }).success).toBe(true);
+    }
+  });
+
+  it("parses the agency people lookup", () => {
+    const body = {
+      agencyId: "agency-a",
+      people: { "nurse-1": refs.people["nurse-1"] },
+    };
+    expect(AgencyPeopleResponseSchema.parse(body)).toEqual(body);
+    expect(
+      AgencyPeopleResponseSchema.safeParse({ ...body, shifts: {} }).success,
+    ).toBe(false);
   });
 });
 

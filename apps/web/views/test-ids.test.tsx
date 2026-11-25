@@ -18,6 +18,7 @@ import {
   shift1,
   shift2,
   submittedTimesheet,
+  refs,
 } from "../test/fixtures";
 import { renderApp } from "../test/render";
 import { AdminView } from "./admin/AdminView";
@@ -68,7 +69,7 @@ const views: {
     user: nurse,
     routes: {
       "GET /api/shifts": { shifts: seedShifts },
-      "GET /api/timesheets": { timesheets: [] },
+      "GET /api/timesheets": { timesheets: [], refs },
       "GET /api/credentials": { credentials: [credential] },
     },
     ready: () => screen.findAllByTestId(TEST_IDS.shiftCancelButton),
@@ -86,7 +87,7 @@ const views: {
         agencyId: "agency-a",
         shifts: [shift1, shift2],
       },
-      "GET /api/timesheets": { timesheets: [submittedTimesheet] },
+      "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
     },
     ready: async () => {
       await screen.findAllByTestId(TEST_IDS.shiftCancelButton);
@@ -102,10 +103,10 @@ const views: {
     ),
     user: admin,
     routes: {
-      "GET /api/admin/shifts": { shifts: adminShifts },
-      "GET /api/admin/audit-log": { entries: [auditEntry] },
-      "GET /api/admin/outbox": { messages: [outboxMessage] },
-      "GET /api/timesheets": { timesheets: [submittedTimesheet] },
+      "GET /api/admin/shifts": { shifts: adminShifts, refs },
+      "GET /api/admin/audit-log": { entries: [auditEntry], refs },
+      "GET /api/admin/outbox": { messages: [outboxMessage], refs },
+      "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
     },
     ready: () => screen.findAllByTestId(TEST_IDS.adminShiftStatusBadge),
   },

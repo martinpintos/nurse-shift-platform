@@ -12,6 +12,7 @@ import {
   shift1,
   shift2,
   submittedTimesheet,
+  refs,
 } from "../../test/fixtures";
 import { renderApp } from "../../test/render";
 import { tomorrowIsoDate } from "../../lib/format";
@@ -30,7 +31,7 @@ function renderAgency(routes: Record<string, RouteHandler> = {}) {
           agencyId: "agency-a",
           shifts: [shift1, shift2],
         },
-        "GET /api/timesheets": { timesheets: [submittedTimesheet] },
+        "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
         ...routes,
       },
     },

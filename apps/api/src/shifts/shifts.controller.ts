@@ -13,6 +13,7 @@ import {
   CancelShiftRequestSchema,
   CreateShiftRequestSchema,
   IdSchema,
+  type AgencyPeopleResponse,
   type AgencyShiftListResponse,
   type CancelShiftRequest,
   type CancelShiftResponse,
@@ -77,5 +78,14 @@ export class AgencyShiftsController {
     @Param("agencyId", { schema: IdSchema }) agencyId: string,
   ): Promise<AgencyShiftListResponse> {
     return this.shifts.listForAgency(principal, agencyId);
+  }
+
+  @Get(":agencyId/people")
+  @Access("GET /api/agencies/:agencyId/people")
+  people(
+    @CurrentUser() principal: Principal,
+    @Param("agencyId", { schema: IdSchema }) agencyId: string,
+  ): Promise<AgencyPeopleResponse> {
+    return this.shifts.peopleForAgency(principal, agencyId);
   }
 }

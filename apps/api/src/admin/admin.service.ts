@@ -1,9 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type {
-  AdminShiftListResponse,
-  AuditLogResponse,
-  OutboxResponse,
-  ResetResponse,
+import {
+  EMPTY_REFS,
+  type AdminShiftListResponse,
+  type AuditLogResponse,
+  type OutboxResponse,
+  type ResetResponse,
 } from "@repo/shared";
 import { AnalyticsService } from "../analytics/analytics.service.js";
 import { recordAudit, toAuditLogEntryDto } from "../audit/audit.js";
@@ -56,7 +57,8 @@ export class AdminService {
           : (row.timesheets.find((t) => t.nurseId === row.claimedById)
               ?.status ?? null),
     }));
-    return { shifts: shifts.sort(compareShifts) };
+    // Placeholder until names are resolved (redesign step 2).
+    return { shifts: shifts.sort(compareShifts), refs: EMPTY_REFS };
   }
 
   async auditLog(limit: number): Promise<AuditLogResponse> {
@@ -64,7 +66,7 @@ export class AdminService {
       orderBy: { seq: "desc" },
       take: limit,
     });
-    return { entries: rows.map(toAuditLogEntryDto) };
+    return { entries: rows.map(toAuditLogEntryDto), refs: EMPTY_REFS };
   }
 
   async outbox(): Promise<OutboxResponse> {
@@ -72,7 +74,7 @@ export class AdminService {
       orderBy: { seq: "desc" },
       take: OUTBOX_LIMIT,
     });
-    return { messages: rows.map(toOutboxMessageDto) };
+    return { messages: rows.map(toOutboxMessageDto), refs: EMPTY_REFS };
   }
 
   /** Restores the spec's sample data; the reset itself is the new log's first entry. */

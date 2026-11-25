@@ -1,10 +1,6 @@
-import styles from "./page.module.css";
+import { RoleRedirect } from "../components/RoleRouting";
 
+/** `/` has no content of its own: it sends people to /login or their role's home. */
 export default function Home() {
-  return (
-    <main className={styles.main}>
-      <h1>ShiftPatch</h1>
-      <p>Open nursing shifts, posted by agencies and claimed by nurses.</p>
-    </main>
-  );
+  return <RoleRedirect />;
 }

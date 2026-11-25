@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Providers } from "../components/Providers";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -12,8 +13,17 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ShiftPatch",
+  title: { default: "ShiftPatch", template: "%s · ShiftPatch" },
   description: "Shift marketplace for healthcare staffing",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f7f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d1114" },
+  ],
 };
 
 export default function RootLayout({
@@ -24,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

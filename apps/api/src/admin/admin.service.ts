@@ -5,11 +5,14 @@ import type {
   OutboxResponse,
   ResetResponse,
 } from "@repo/shared";
+import { AnalyticsService } from "../analytics/analytics.service.js";
 import { recordAudit, toAuditLogEntryDto } from "../audit/audit.js";
 import type { Principal } from "../auth/principal.js";
+import { Clock, utcToday } from "../common/clock.js";
 import { toOutboxMessageDto } from "../outbox/outbox.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { seedDatabase } from "../seed/seed.js";
+import { buildLicenseExport, type LicenseExport } from "./license-export.js";
 import {
   compareShifts,
   fromDbCancelReason,
@@ -22,7 +25,11 @@ export const OUTBOX_LIMIT = 200;
 
 @Injectable()
 export class AdminService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(Clock) private readonly clock: Clock,
+    @Inject(AnalyticsService) private readonly analytics: AnalyticsService,
+  ) {}
 
   /** The dashboard feed: every shift, its cancellations and the current claim's timesheet. */
   async shifts(): Promise<AdminShiftListResponse> {
@@ -78,5 +85,48 @@ export class AdminService {
       }),
     );
     return { status: "reset" };
+  }
+
+  /**
+   * The inspector's export: license documents and a compliance CSV, built and audited in
+   * one transaction, so every export that leaves the system is in the audit log.
+   */
+  async exportLicenses(admin: Principal): Promise<LicenseExport> {
+    const today = utcToday(this.clock);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const nurses = await tx.user.findMany({
+        where: { role: "nurse" },
+        select: { id: true, name: true },
+        orderBy: { id: "asc" },
+      });
+      const credentials = await tx.credential.findMany({
+        select: {
+          id: true,
+          nurseId: true,
+          fileName: true,
+          expiresOn: true,
+          data: true,
+        },
+        orderBy: [{ nurseId: "asc" }, { uploadedAt: "asc" }, { id: "asc" }],
+      });
+      const built = buildLicenseExport({
+        nurses,
+        credentials,
+        today,
+        exportedBy: admin.id,
+      });
+      await recordAudit(tx, admin, {
+        action: "licenses.exported",
+        entityType: "system",
+        entityId: null,
+        details: { documents: built.documents, nurses: built.nurses },
+      });
+      return built;
+    });
+    this.analytics.capture("licenses_exported", admin.id, {
+      documents: result.documents,
+      nurses: result.nurses,
+    });
+    return result;
   }
 }

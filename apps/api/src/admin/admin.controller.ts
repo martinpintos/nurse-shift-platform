@@ -6,6 +6,8 @@ import {
   Inject,
   Post,
   Query,
+  Res,
+  StreamableFile,
 } from "@nestjs/common";
 import { CurrentUser } from "@nestjs/authentication";
 import {
@@ -16,6 +18,7 @@ import {
   type OutboxResponse,
   type ResetResponse,
 } from "@repo/shared";
+import type { Response } from "express";
 import { Access } from "../auth/access.js";
 import type { Principal } from "../auth/principal.js";
 import { AdminService } from "./admin.service.js";
@@ -49,5 +52,22 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   reset(@CurrentUser() principal: Principal): Promise<ResetResponse> {
     return this.admin.reset(principal);
+  }
+
+  /** A zip of every license document plus compliance.csv. Every export is audited. */
+  @Get("exports/licenses")
+  @Access("GET /api/admin/exports/licenses")
+  async exportLicenses(
+    @CurrentUser() principal: Principal,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const file = await this.admin.exportLicenses(principal);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, no-store");
+    return new StreamableFile(file.data, {
+      type: "application/zip",
+      disposition: `attachment; filename="${file.fileName}"`,
+      length: file.data.byteLength,
+    });
   }
 }

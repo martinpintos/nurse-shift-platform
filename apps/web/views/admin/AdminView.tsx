@@ -33,6 +33,7 @@ import {
   formatClockTime,
   formatDateTime,
 } from "../../lib/format";
+import { saveBlob } from "../../lib/download";
 import { useApi } from "../../lib/session";
 import { useAction } from "../../lib/use-action";
 import { POLL_INTERVAL_MS, usePolling } from "../../lib/use-polling";
@@ -270,6 +271,20 @@ export function AdminView() {
     if (done) reloadAll();
   }
 
+  async function exportLicenses() {
+    if (pending) return;
+    const done = await run(
+      "export",
+      async () => {
+        const { blob, fileName } = await api.exportLicenses();
+        saveBlob(blob, fileName);
+      },
+      SUCCESS_MESSAGES.licensesExported,
+    );
+    // The export is in the audit log now.
+    if (done) audit.reload();
+  }
+
   const allShifts = [...(shifts.data?.shifts ?? [])].sort(byDateAndTime);
   const openCount = allShifts.filter((shift) => shift.status === "open").length;
   const filledCount = allShifts.filter(
@@ -301,14 +316,24 @@ export function AdminView() {
           </span>
         }
         actions={
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-disabled={pending === "reset" || undefined}
-            onClick={() => void reset()}
-          >
-            {pending === "reset" ? "Resetting…" : "Reset demo data"}
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-disabled={pending === "export" || undefined}
+              onClick={() => void exportLicenses()}
+            >
+              {pending === "export" ? "Exporting…" : "Export license documents"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-disabled={pending === "reset" || undefined}
+              onClick={() => void reset()}
+            >
+              {pending === "reset" ? "Resetting…" : "Reset demo data"}
+            </button>
+          </>
         }
       />
 

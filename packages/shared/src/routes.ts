@@ -77,6 +77,12 @@ export const ROUTES = [
   },
   { method: "GET", path: "/api/admin/outbox", access: ["admin"], spec: false },
   { method: "POST", path: "/api/admin/reset", access: ["admin"], spec: false },
+  {
+    method: "GET",
+    path: "/api/admin/exports/licenses",
+    access: ["admin"],
+    spec: false,
+  },
 ] as const satisfies readonly RouteDefinition[];
 
 export type RoutePath = (typeof ROUTES)[number]["path"];

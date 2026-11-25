@@ -61,6 +61,7 @@ The six routes in [`docs/spec.md`](docs/spec.md) are unchanged. Every route, spe
 | `GET /api/admin/audit-log`         | admin                                         | every state change, newest first (`?limit=`, default 100)                 |
 | `GET /api/admin/outbox`            | admin                                         | the claim and cancellation notifications that would have been emailed     |
 | `POST /api/admin/reset`            | admin                                         | restores the spec's sample data                                           |
+| `GET /api/admin/exports/licenses`  | admin                                         | zip of every license document plus `compliance.csv`; audited              |
 
 ## End-to-end tests
 
@@ -175,3 +176,4 @@ Product and engineering decisions, recorded as they are made.
   - Each has a strict allow-list of ids, enum values and counts (`apps/api/src/analytics/analytics.events.ts`). An event with any other property is dropped, never sent.
   - `distinct_id` is the user id; GeoIP is off and no person profiles are created. Names, emails, credential files and health data are never sent.
   - Without `POSTHOG_KEY` (local, CI), analytics is off.
+- **License export (admin only):** `GET /api/admin/exports/licenses` returns a zip of every nurse's license documents, `compliance.csv` (latest expiry and status on the export date) and a README. TB results are not stored, so they are never included (ESCALATION.md). It is built and audited (`licenses.exported`, counts only) in one transaction. CSV cells are protected against spreadsheet formula injection, and downloads are `no-store` attachments.

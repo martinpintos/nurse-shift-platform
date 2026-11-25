@@ -175,6 +175,39 @@ describe("AdminView", () => {
     );
   });
 
+  it("downloads the license export and confirms it in the banner", async () => {
+    const createObjectURL = vi.fn(() => "blob:export");
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    const { api } = renderAdmin({
+      "GET /api/admin/exports/licenses": () =>
+        new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
+          headers: {
+            "Content-Type": "application/zip",
+            "Content-Disposition":
+              'attachment; filename="shiftpatch-licenses-2026-11-24.zip"',
+          },
+        }),
+    });
+    await screen.findByTestId(TEST_IDS.adminDashboardShiftTable);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Export license documents" }),
+    );
+
+    await waitFor(() =>
+      expect(banner().textContent).toBe("License export downloaded"),
+    );
+    expect(api.callsTo("GET /api/admin/exports/licenses")).toHaveLength(1);
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    const link = click.mock.contexts[0] as HTMLAnchorElement;
+    expect(link.download).toBe("shiftpatch-licenses-2026-11-24.zip");
+    click.mockRestore();
+  });
+
   it("resets demo data after a native confirm", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { api } = renderAdmin({

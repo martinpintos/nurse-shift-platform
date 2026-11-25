@@ -32,8 +32,9 @@ fi
 step "install (frozen lockfile)" pnpm install --frozen-lockfile --silent
 step "format" pnpm exec prettier --check . --log-level warn
 step "dependency audit" pnpm audit --prod --audit-level high
-step "check-types lint test build" pnpm turbo run check-types lint test build --ui=stream --output-logs=errors-only
+# Migrations first: the API's e2e tests need the current schema, as in CI.
 step "migrations applied locally" pnpm --filter api exec prisma migrate deploy
+step "check-types lint test build" pnpm turbo run check-types lint test build --ui=stream --output-logs=errors-only
 step "schema drift" pnpm --filter api exec prisma migrate diff \
   --from-config-datasource --to-schema prisma/schema.prisma --exit-code
 

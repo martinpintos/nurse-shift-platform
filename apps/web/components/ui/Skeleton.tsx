@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import styles from "./Skeleton.module.css";
 
 /** A shimmering placeholder block. Decorative: wrap groups in `SkeletonGroup`. */
@@ -44,6 +44,15 @@ export function SkeletonGroup({
 
 const WIDTHS = ["72%", "54%", "64%", "46%", "58%"];
 
+export function ListFilterSkeleton() {
+  return (
+    <div className={styles.filters} aria-hidden="true">
+      <Skeleton />
+      <Skeleton />
+    </div>
+  );
+}
+
 /** Rows shaped like a table's, header included. */
 export function TableSkeleton({
   label,
@@ -81,21 +90,39 @@ export function ListSkeleton({
   label,
   rows = 3,
   action = true,
+  dated = false,
 }: {
   label: string;
   rows?: number;
   action?: boolean;
+  dated?: boolean;
 }) {
   return (
-    <SkeletonGroup label={label} className={styles.list}>
+    <SkeletonGroup
+      label={label}
+      className={dated ? styles.datedList : styles.list}
+    >
       {Array.from({ length: rows }, (_, row) => (
-        <div key={row} className={styles.listRow}>
-          <div className={styles.listText}>
-            <Skeleton width={WIDTHS[row % WIDTHS.length]} height={16} />
-            <Skeleton width="38%" height={12} />
+        <Fragment key={row}>
+          {dated ? (
+            <div className={styles.dateBand}>
+              <Skeleton width={132} height={14} />
+            </div>
+          ) : null}
+          <div className={styles.listRow}>
+            <div className={styles.listText}>
+              <Skeleton width={WIDTHS[row % WIDTHS.length]} height={16} />
+              <Skeleton width="38%" height={12} />
+            </div>
+            {dated ? (
+              <div className={styles.listTime}>
+                <Skeleton width={92} height={16} />
+                <Skeleton width={118} height={12} />
+              </div>
+            ) : null}
+            {action ? <Skeleton width={112} height={36} radius={8} /> : null}
           </div>
-          {action ? <Skeleton width={112} height={36} radius={8} /> : null}
-        </div>
+        </Fragment>
       ))}
     </SkeletonGroup>
   );

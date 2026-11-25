@@ -13,49 +13,51 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-2);
   max-height: min(60vh, 320px);
-  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   overflow-y: auto;
   border: 1px solid var(--toast-border);
-  border-left: 4px solid var(--toast-accent);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--toast-bg);
+  color: var(--toast-text);
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
 }
 
 .toast[data-variant="success"] {
-  --toast-accent: var(--tone-success-dot);
+  --toast-bg: var(--tone-success-bg);
   --toast-border: var(--tone-success-border);
-  --toast-icon: var(--tone-success-text);
+  --toast-text: var(--tone-success-text);
 }
 
 .toast[data-variant="error"] {
-  --toast-accent: var(--tone-danger-dot);
+  --toast-bg: var(--tone-danger-bg);
   --toast-border: var(--tone-danger-border);
-  --toast-icon: var(--tone-danger-text);
+  --toast-text: var(--tone-danger-text);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .toast {
-    animation: toast-in var(--motion-medium) var(--ease-out);
+    transition: opacity var(--motion-fast) ease-out;
+  }
+
+  @starting-style {
+    .toast {
+      opacity: 0;
+    }
   }
 }
 
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
+.toast[data-closing] {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .icon {
   display: inline-flex;
   flex: none;
-  margin-top: 1px;
-  color: var(--toast-icon);
+  margin-top: 5px;
 }
 
 .message {
@@ -65,7 +67,7 @@
   font-weight: var(--font-weight-semibold);
   line-height: 1.4;
   overflow-wrap: anywhere;
-  padding-top: 2px;
+  padding-top: 4px;
 }
 
 .dismiss {
@@ -77,12 +79,26 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--color-text-muted);
+  color: inherit;
 }
 
 .dismiss:hover {
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+  background: var(--toast-border);
+}
+
+@media (pointer: coarse) {
+  .dismiss {
+    width: 44px;
+    height: 44px;
+  }
+
+  .toast .message {
+    padding-top: 12px;
+  }
+
+  .icon {
+    margin-top: 13px;
+  }
 }
 
 /*

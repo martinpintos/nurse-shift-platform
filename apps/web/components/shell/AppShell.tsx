@@ -1,12 +1,13 @@
 "use client";
 
-import type { MeResponse } from "@repo/shared";
+import type { MeResponse, UserRole } from "@repo/shared";
 import {
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { ROLE_LABEL } from "../../lib/roles";
@@ -14,6 +15,7 @@ import { useSession } from "../../lib/session";
 import { Brand } from "../BrandMark";
 import { BrandMark } from "../BrandMark";
 import { LogOutIcon, SidebarIcon } from "../ui/icons";
+import { Skeleton } from "../ui/Skeleton";
 import { Avatar } from "../ui/Text";
 import { ShellContext, type ShellValue } from "./ShellContext";
 import { ROLE_SECTIONS, panelOf, panelsOf } from "./sections";
@@ -44,6 +46,11 @@ function writeCollapsed(collapsed: boolean): void {
   } catch {
     // Storage blocked (private mode): the choice lasts until reload.
   }
+}
+
+function subscribeToStorage(listener: () => void) {
+  window.addEventListener("storage", listener);
+  return () => window.removeEventListener("storage", listener);
 }
 
 function AccountMenu({
@@ -108,20 +115,26 @@ function AccountMenu({
  * user card; nothing in the shell moves when it appears.
  */
 export function AppShell({
+  role,
   user,
   children,
 }: {
-  user: MeResponse;
+  role: UserRole;
+  user?: MeResponse;
   children: ReactNode;
 }) {
   const { logout } = useSession();
-  const sections = ROLE_SECTIONS[user.role];
+  const sections = ROLE_SECTIONS[role];
   const panels = panelsOf(sections);
   const [activePanel, setActivePanel] = useState<string>(panels[0]?.id ?? "");
   const currentSection = useScrollSpy(sections.map((section) => section.id));
-  // The shell renders only on the client, once the session has resolved, so the saved
-  // choice can be read up front without a hydration mismatch.
-  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const savedCollapsed = useSyncExternalStore(
+    subscribeToStorage,
+    readCollapsed,
+    () => false,
+  );
+  const [collapsedOverride, setCollapsedOverride] = useState<boolean>();
+  const collapsed = collapsedOverride ?? savedCollapsed;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -130,10 +143,8 @@ export function AppShell({
   }, [collapsed]);
 
   function toggleSidebar() {
-    setCollapsed((value) => {
-      writeCollapsed(!value);
-      return !value;
-    });
+    setCollapsedOverride(!collapsed);
+    writeCollapsed(!collapsed);
   }
 
   const shell = useMemo<ShellValue>(
@@ -184,11 +195,13 @@ export function AppShell({
               return (
                 <li key={section.id}>
                   <a
-                    href={`#${section.id}`}
+                    href={user ? `#${section.id}` : undefined}
                     className={styles.navLink}
                     aria-current={current ? "location" : undefined}
                     title={collapsed ? section.label : undefined}
-                    onClick={() => setActivePanel(panelOf(section))}
+                    onClick={
+                      user ? () => setActivePanel(panelOf(section)) : undefined
+                    }
                   >
                     <Icon size={18} />
                     <span className={styles.navLabel}>{section.label}</span>
@@ -198,30 +211,42 @@ export function AppShell({
             })}
           </ul>
         </nav>
-        <div
-          className={styles.userCard}
-          title={collapsed ? user.name : undefined}
-        >
-          <Avatar name={user.name} size={32} />
-          <div className={styles.userText}>
-            <span className={styles.userName}>{user.name}</span>
-            <span className={styles.userRole}>{ROLE_LABEL[user.role]}</span>
-          </div>
-          <button
-            type="button"
-            className={styles.signOut}
-            aria-label="Sign out"
-            title="Sign out"
-            onClick={logout}
+        {user ? (
+          <div
+            className={styles.userCard}
+            title={collapsed ? user.name : undefined}
           >
-            <LogOutIcon size={18} />
-          </button>
-        </div>
+            <Avatar name={user.name} size={32} />
+            <div className={styles.userText}>
+              <span className={styles.userName}>{user.name}</span>
+              <span className={styles.userRole}>{ROLE_LABEL[user.role]}</span>
+            </div>
+            <button
+              type="button"
+              className={styles.signOut}
+              aria-label="Sign out"
+              title="Sign out"
+              onClick={logout}
+            >
+              <LogOutIcon size={18} />
+            </button>
+          </div>
+        ) : (
+          <div className={styles.userCard}>
+            <Skeleton width={32} height={32} radius="50%" />
+          </div>
+        )}
       </aside>
 
       <header className={styles.topBar}>
         <Brand onDark />
-        <AccountMenu user={user} onSignOut={logout} />
+        {user ? (
+          <AccountMenu user={user} onSignOut={logout} />
+        ) : (
+          <div className={styles.avatarButton}>
+            <Skeleton width={36} height={36} radius="50%" />
+          </div>
+        )}
       </header>
 
       <main
@@ -242,6 +267,7 @@ export function AppShell({
               key={panel.id}
               type="button"
               className={styles.tab}
+              disabled={!user}
               aria-current={current ? "page" : undefined}
               onClick={() => showPanel(panel.id)}
             >

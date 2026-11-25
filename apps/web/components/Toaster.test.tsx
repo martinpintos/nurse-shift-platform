@@ -115,7 +115,9 @@ describe("Toaster", () => {
     const first = screen.getByTestId(TEST_IDS.notificationBanner);
     expect(first.textContent).toBe("Shift claimed");
     expect(first.dataset.variant).toBe("success");
-    expect(first.getAttribute("role")).toBe("status");
+    expect(document.querySelector('[aria-live="polite"]')?.textContent).toBe(
+      "Shift claimed",
+    );
 
     click();
     await act(async () =>

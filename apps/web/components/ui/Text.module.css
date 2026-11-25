@@ -1,5 +1,5 @@
 .id {
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   white-space: nowrap;

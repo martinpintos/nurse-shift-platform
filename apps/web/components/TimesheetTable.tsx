@@ -1,7 +1,7 @@
 "use client";
 
 import { TEST_IDS, type Timesheet } from "@repo/shared";
-import { formatDay, formatMinutes } from "../lib/format";
+import { formatMinutes, formatShiftDate } from "../lib/format";
 import type { Lookup } from "../lib/lookup";
 import { StatusBadge } from "./ui/Badge";
 import { Button } from "./ui/Button";
@@ -28,29 +28,29 @@ export function TimesheetTable({
   onApprove?: (timesheet: Timesheet) => void;
   approvingId?: string | null;
 }) {
-  const columns =
-    5 + (showNurse ? 1 : 0) + (showAgency ? 1 : 0) + (onApprove ? 1 : 0);
   return (
     <Table label="Timesheets" testId={TEST_IDS.timesheetTable}>
-      <thead>
-        <tr>
-          <Th>Date</Th>
-          {showNurse ? <Th>Nurse</Th> : null}
-          <Th>Shift</Th>
-          {showAgency ? <Th>Agency</Th> : null}
-          <Th>Hours</Th>
-          <Th end>Worked</Th>
-          <Th>Status</Th>
-          {onApprove ? (
-            <Th>
-              <span className="visually-hidden">Actions</span>
-            </Th>
-          ) : null}
-        </tr>
-      </thead>
+      {timesheets.length > 0 ? (
+        <thead>
+          <tr>
+            <Th>Date</Th>
+            {showNurse ? <Th>Nurse</Th> : null}
+            <Th>Shift</Th>
+            {showAgency ? <Th>Agency</Th> : null}
+            <Th>Hours</Th>
+            <Th end>Worked</Th>
+            <Th>Status</Th>
+            {onApprove ? (
+              <Th>
+                <span className="visually-hidden">Actions</span>
+              </Th>
+            ) : null}
+          </tr>
+        </thead>
+      ) : null}
       <tbody>
         {timesheets.length === 0 ? (
-          <EmptyRow colSpan={columns}>No timesheets yet.</EmptyRow>
+          <EmptyRow colSpan={1}>No timesheets yet.</EmptyRow>
         ) : (
           timesheets.map((timesheet) => {
             const shift = lookup.shift(timesheet.shiftId);
@@ -58,12 +58,8 @@ export function TimesheetTable({
               <tr key={timesheet.id}>
                 <Td label="Date">
                   <CellStack
-                    primary={
-                      <span className="nowrap">
-                        {formatDay(timesheet.date)}
-                      </span>
-                    }
-                    secondary={timesheet.shiftId}
+                    primary={<span>{formatShiftDate(timesheet.date)}</span>}
+                    secondary={showNurse ? timesheet.shiftId : undefined}
                   />
                 </Td>
                 {showNurse ? (
@@ -74,7 +70,9 @@ export function TimesheetTable({
                     ? showAgency
                       ? shift.role
                       : `${shift.role} · ${shift.agencyName}`
-                    : timesheet.shiftId}
+                    : showNurse
+                      ? timesheet.shiftId
+                      : "Shift details unavailable"}
                 </Td>
                 {showAgency ? (
                   <Td label="Agency">

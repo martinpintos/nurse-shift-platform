@@ -7,16 +7,40 @@ export function PageHeader({
   title,
   meta,
   actions,
+  mobileTitle,
+  titleStatus,
 }: {
   title: string;
   meta?: ReactNode;
   actions?: ReactNode;
+  /** The active panel's title when the page shows one panel at a time. */
+  mobileTitle?: string;
+  titleStatus?: ReactNode;
 }) {
   return (
     <div className={styles.pageHeader}>
       <div className={styles.pageTitle}>
-        <h1>{title}</h1>
-        {meta ? <div className={styles.meta}>{meta}</div> : null}
+        <div className={styles.titleLine}>
+          <h1>
+            {mobileTitle ? (
+              <>
+                <span className={styles.desktopTitle}>{title}</span>
+                <span className={styles.mobileTitle}>{mobileTitle}</span>
+              </>
+            ) : (
+              title
+            )}
+          </h1>
+          {titleStatus}
+        </div>
+        {meta ? (
+          <div
+            className={styles.meta}
+            data-desktop-only={Boolean(mobileTitle) || undefined}
+          >
+            {meta}
+          </div>
+        ) : null}
       </div>
       {actions ? <div className={styles.actions}>{actions}</div> : null}
     </div>
@@ -34,6 +58,8 @@ export function Section({
   actions,
   variant = "plain",
   className,
+  hideMobileHeading,
+  fullWidthMobileActions,
   children,
 }: {
   id?: string;
@@ -43,6 +69,8 @@ export function Section({
   /** "card" puts the section on a white surface (side rails, compact panels). */
   variant?: "plain" | "card";
   className?: string;
+  hideMobileHeading?: boolean;
+  fullWidthMobileActions?: boolean;
   children: ReactNode;
 }) {
   const headingId = useId();
@@ -54,14 +82,24 @@ export function Section({
         .join(" ")}
       aria-labelledby={headingId}
     >
-      <div className={styles.header}>
+      <div
+        className={styles.header}
+        data-hide-mobile={hideMobileHeading || undefined}
+      >
         <h2 id={headingId} className={styles.title}>
           {title}
           {count === undefined ? null : (
             <span className={styles.count}>{count}</span>
           )}
         </h2>
-        {actions ? <div className={styles.actions}>{actions}</div> : null}
+        {actions ? (
+          <div
+            className={styles.actions}
+            data-mobile-full-width={fullWidthMobileActions || undefined}
+          >
+            {actions}
+          </div>
+        ) : null}
       </div>
       {children}
     </section>

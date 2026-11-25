@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "./api";
 
+const RETRY_DELAY_MS = 300;
+
 export interface Resource<T> {
   /** The last successful result. Kept while reloading, so lists don't flash. */
   data: T | undefined;
@@ -29,10 +31,14 @@ interface ResourceState<T> {
 }
 
 /**
- * Loads data for a view. `load` must be stable (wrap it in useCallback); `reload()` fetches
- * again, and a response that arrives after a newer reload (or a `mutate`) is dropped.
+ * Loads data for a view. `load` and `shouldRetry` must be stable. A response that arrives
+ * after a newer reload or mutation is dropped. A retryable failure gets one quick retry
+ * before it changes the visible state.
  */
-export function useResource<T>(load: () => Promise<T>): Resource<T> {
+export function useResource<T>(
+  load: () => Promise<T>,
+  shouldRetry?: (error: unknown) => boolean,
+): Resource<T> {
   const [state, setState] = useState<ResourceState<T>>({
     data: undefined,
     error: null,
@@ -46,27 +52,49 @@ export function useResource<T>(load: () => Promise<T>): Resource<T> {
   useEffect(() => {
     const current = ++generation.current;
     let active = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const isCurrent = () => active && generation.current === current;
-    load().then(
-      (data) => {
-        if (isCurrent()) {
-          setState({ data, error: null, settled: true, updatedAt: new Date() });
-        }
-      },
-      (error: unknown) => {
-        if (isCurrent()) {
+
+    function request(canRetry: boolean) {
+      if (!isCurrent()) return;
+      load().then(
+        (data) => {
+          if (isCurrent()) {
+            setState({
+              data,
+              error: null,
+              settled: true,
+              updatedAt: new Date(),
+            });
+          }
+        },
+        (error: unknown) => {
+          if (!isCurrent()) return;
+          if (canRetry && shouldRetry?.(error)) {
+            retryTimer = setTimeout(() => request(false), RETRY_DELAY_MS);
+            return;
+          }
           setState((previous) => ({
             ...previous,
             error: errorMessage(error),
             settled: true,
           }));
-        }
-      },
-    );
+        },
+      );
+    }
+
+    if (version === 0) {
+      // Strict Mode replays the mount effect. Let the discarded setup finish before fetching.
+      queueMicrotask(() => request(true));
+    } else {
+      request(true);
+    }
+
     return () => {
       active = false;
+      clearTimeout(retryTimer);
     };
-  }, [load, version]);
+  }, [load, shouldRetry, version]);
 
   const reload = useCallback(() => setVersion((n) => n + 1), []);
 

@@ -9,10 +9,7 @@ import {
   type Timesheet,
 } from "@repo/shared";
 import { useCallback, useState } from "react";
-import {
-  STAFF_CANCEL_OPTIONS,
-  ShiftCancelControl,
-} from "../../components/ShiftCancelControl";
+import { ShiftCancelControl } from "../../components/ShiftCancelControl";
 import {
   ShiftHours,
   byDateAndTime,
@@ -36,7 +33,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { CellStack, EmptyRow, Table, Td, Th } from "../../components/ui/Table";
 import { Tabs, tabPanelProps } from "../../components/ui/Tabs";
 import { ApiError } from "../../lib/api";
-import { formatDay } from "../../lib/format";
+import { formatShiftDate } from "../../lib/format";
 import { createLookup, type Lookup } from "../../lib/lookup";
 import { useApi, useCurrentUser } from "../../lib/session";
 import { useAction } from "../../lib/use-action";
@@ -51,10 +48,12 @@ type ShiftTab = "all" | "open" | "filled";
 
 function AgencyShiftTable({
   shifts,
+  timesheets,
   lookup,
   onCancelled,
 }: {
   shifts: Shift[];
+  timesheets: Timesheet[] | undefined;
   lookup: Lookup;
   onCancelled: (result: CancelShiftResponse) => void;
 }) {
@@ -76,42 +75,54 @@ function AgencyShiftTable({
         {shifts.length === 0 ? (
           <EmptyRow colSpan={6}>No shifts in this view.</EmptyRow>
         ) : (
-          shifts.map((shift) => (
-            <tr key={shift.id}>
-              <Td label="Date">
-                <CellStack
-                  primary={
-                    <strong className="nowrap">{formatDay(shift.date)}</strong>
-                  }
-                  secondary={shift.id}
-                />
-              </Td>
-              <Td label="Role">{shift.role}</Td>
-              <Td label="Hours">
-                <ShiftHours shift={shift} />
-              </Td>
-              <Td label="Status">
-                <StatusBadge kind="shift" status={shift.status} />
-              </Td>
-              <Td label="Assigned nurse">
-                {shift.claimedBy ? (
-                  lookup.name(shift.claimedBy)
-                ) : (
-                  <span className="muted">—</span>
-                )}
-              </Td>
-              <Td end>
-                {shift.status === "filled" && shift.claimedBy ? (
-                  <ShiftCancelControl
-                    shiftId={shift.id}
-                    shiftLabel={shiftLabel(shift)}
-                    options={STAFF_CANCEL_OPTIONS}
-                    onCancelled={onCancelled}
+          shifts.map((shift) => {
+            const timesheet = timesheets?.find(
+              (entry) =>
+                entry.shiftId === shift.id && entry.nurseId === shift.claimedBy,
+            );
+            return (
+              <tr key={shift.id}>
+                <Td label="Date">
+                  <CellStack
+                    primary={<strong>{formatShiftDate(shift.date)}</strong>}
+                    secondary={shift.id}
                   />
-                ) : null}
-              </Td>
-            </tr>
-          ))
+                </Td>
+                <Td label="Role">{shift.role}</Td>
+                <Td label="Hours">
+                  <ShiftHours shift={shift} />
+                </Td>
+                <Td label="Status">
+                  <StatusBadge kind="shift" status={shift.status} />
+                </Td>
+                <Td label="Assigned nurse">
+                  {shift.claimedBy ? (
+                    <CellStack
+                      primary={lookup.name(shift.claimedBy)}
+                      secondary={
+                        timesheet ? `Timesheet ${timesheet.status}` : undefined
+                      }
+                    />
+                  ) : (
+                    <span className="muted">Unassigned</span>
+                  )}
+                </Td>
+                <Td end>
+                  {shift.status === "filled" &&
+                  shift.claimedBy &&
+                  timesheets &&
+                  !timesheet ? (
+                    <ShiftCancelControl
+                      shiftId={shift.id}
+                      shiftLabel={shiftLabel(shift)}
+                      staff
+                      onCancelled={onCancelled}
+                    />
+                  ) : null}
+                </Td>
+              </tr>
+            );
+          })
         )}
       </tbody>
     </Table>
@@ -198,23 +209,25 @@ export function AgencyView() {
     ? pending.slice("approve:".length)
     : null;
 
-  const finding = shifts.loading
-    ? null
-    : counts.open === 0
-      ? "Every shift is covered"
-      : `${counts.open} ${counts.open === 1 ? "shift needs" : "shifts need"} a nurse`;
+  const finding =
+    !shifts.data || counts.all === 0
+      ? null
+      : counts.open === 0
+        ? "All shifts are covered"
+        : `${counts.open} ${counts.open === 1 ? "shift needs" : "shifts need"} a nurse`;
 
   return (
     <PageStack>
       <PageHeader
         title="Shifts"
         meta={
-          finding ? (
+          finding || awaiting > 0 ? (
             <>
-              <span>{finding}</span>
+              {finding ? <span>{finding}</span> : null}
               {awaiting > 0 ? (
                 <span>
-                  · {awaiting} {awaiting === 1 ? "timesheet" : "timesheets"} to
+                  {finding ? "· " : ""}
+                  {awaiting} {awaiting === 1 ? "timesheet" : "timesheets"} to
                   approve
                 </span>
               ) : null}
@@ -246,9 +259,21 @@ export function AgencyView() {
             value={tab}
             onChange={setTab}
             items={[
-              { id: "all", label: "All shifts", count: counts.all },
-              { id: "open", label: "Open", count: counts.open },
-              { id: "filled", label: "Filled", count: counts.filled },
+              {
+                id: "all",
+                label: "All shifts",
+                count: shifts.data ? counts.all : undefined,
+              },
+              {
+                id: "open",
+                label: "Open",
+                count: shifts.data ? counts.open : undefined,
+              },
+              {
+                id: "filled",
+                label: "Filled",
+                count: shifts.data ? counts.filled : undefined,
+              },
             ]}
           />
           <div {...tabPanelProps("agency-shifts", tab)}>
@@ -257,13 +282,14 @@ export function AgencyView() {
             ) : null}
             {shifts.loading ? (
               <TableSkeleton label="your shifts" rows={3} columns={6} />
-            ) : ownShifts.length === 0 ? (
+            ) : !shifts.data ? null : ownShifts.length === 0 ? (
               <EmptyState>
                 No shifts posted yet. Use Post shift to add one.
               </EmptyState>
             ) : (
               <AgencyShiftTable
                 shifts={visible}
+                timesheets={timesheets.data?.timesheets}
                 lookup={lookup}
                 onCancelled={applyShift}
               />
@@ -276,21 +302,21 @@ export function AgencyView() {
         <Section
           id="timesheets"
           title="Timesheets"
-          count={timesheets.loading ? undefined : ownTimesheets.length}
+          count={timesheets.data ? ownTimesheets.length : undefined}
         >
           {timesheets.error ? (
             <LoadError message={timesheets.error} onRetry={timesheets.reload} />
           ) : null}
           {timesheets.loading ? (
             <TableSkeleton label="timesheets" rows={2} columns={6} />
-          ) : (
+          ) : timesheets.data ? (
             <TimesheetTable
               timesheets={ownTimesheets}
               lookup={lookup}
               onApprove={(timesheet) => void approve(timesheet)}
               approvingId={approvingId}
             />
-          )}
+          ) : null}
         </Section>
       </Panel>
 

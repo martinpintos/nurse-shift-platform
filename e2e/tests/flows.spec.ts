@@ -160,7 +160,9 @@ test("timesheet: Maria submits her hours, Agency A approves them", async ({
 }) => {
   await signIn(page, USERS.maria, /\/nurse$/);
   await page
-    .getByRole("button", { name: /Submit timesheet for .*shift-2/ })
+    .getByRole("button", {
+      name: /Submit timesheet for LPN shift at Sunrise Health Staffing/,
+    })
     .click();
   await expect(banner(page)).toContainText(SUCCESS_MESSAGES.timesheetSubmitted);
   await expect(page.getByTestId(TEST_IDS.timesheetTable)).toContainText(
@@ -176,6 +178,44 @@ test("timesheet: Maria submits her hours, Agency A approves them", async ({
   await expect(page.getByTestId(TEST_IDS.timesheetTable)).toContainText(
     /approved/i,
   );
+});
+
+test("the nurse can read and use shift and license controls on a narrow screen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await signIn(page, USERS.maria, /\/nurse$/);
+  await expect(openShift(page, "shift-1")).toContainText("19:00 to 07:00");
+  await expect(openShift(page, "shift-1")).not.toContainText("shift-1");
+
+  await page.getByRole("button", { name: "My shifts", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "My shifts",
+    { useInnerText: true },
+  );
+  const card = page
+    .getByRole("list", { name: "Your claimed shifts" })
+    .getByRole("listitem");
+  await expect(card.getByLabel("Actual end")).toBeVisible();
+  const clipped = await card.evaluate((row) => {
+    const { left, right } = row.getBoundingClientRect();
+    return [...row.querySelectorAll("input, button")].some((control) => {
+      const bounds = control.getBoundingClientRect();
+      return bounds.left < left || bounds.right > right;
+    });
+  });
+  expect(clipped).toBe(false);
+  await expect(card.getByText(/no-show/i)).toHaveCount(0);
+
+  await page.getByRole("button", { name: "License", exact: true }).click();
+  const expiry = await page
+    .getByTestId(TEST_IDS.credentialExpiryDateInput)
+    .boundingBox();
+  const upload = await page
+    .getByRole("button", { name: "Upload", exact: true })
+    .boundingBox();
+  expect(expiry).not.toBeNull();
+  expect(upload?.y).toBeGreaterThan(expiry!.y + expiry!.height);
 });
 
 test("the admin exports license documents and the export is audited", async ({

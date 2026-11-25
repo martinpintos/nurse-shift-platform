@@ -40,7 +40,12 @@ export const ROLE_SECTIONS = {
   admin: [
     { id: "coverage", label: "Shift coverage", icon: CalendarIcon },
     { id: "activity", label: "Activity", icon: DocumentIcon },
-    { id: "outbox", label: "Outbox", icon: MailIcon, panel: "activity" },
+    {
+      id: "outbox",
+      label: "Demo email outbox",
+      icon: MailIcon,
+      panel: "activity",
+    },
     { id: "timesheets", label: "Timesheets", icon: ClockIcon },
   ],
 } as const satisfies Record<UserRole, readonly ShellSection[]>;

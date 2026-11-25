@@ -18,7 +18,7 @@ export function BrandMark({ size = 28 }: { size?: number }) {
   );
 }
 
-/** The mark and the name. `onDark` for the navy shell, otherwise navy on light. */
+/** The mark and the name. */
 export function Brand({ onDark = false }: { onDark?: boolean }) {
   return (
     <span className={styles.brand} data-on-dark={onDark || undefined}>

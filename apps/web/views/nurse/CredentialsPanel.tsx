@@ -282,7 +282,7 @@ export function CredentialsPanel({
       <form className={styles.form} onSubmit={onSubmit}>
         <div className={styles.field}>
           <label htmlFor={fileId} className={styles.label}>
-            Upload a renewal
+            {credentials.length > 0 ? "Upload a renewal" : "Upload a license"}
           </label>
           <Input
             ref={fileInput}
@@ -295,8 +295,8 @@ export function CredentialsPanel({
             data-testid={TEST_IDS.credentialUploadInput}
           />
           <p id={hintId} className={styles.hint}>
-            PDF, PNG or JPEG, up to {formatBytes(MAX_CREDENTIAL_BYTES)}. It
-            uploads once the expiry date is set.
+            PDF, PNG or JPEG, up to {formatBytes(MAX_CREDENTIAL_BYTES)}. Upload
+            starts once you select a file and enter the expiry date.
           </p>
         </div>
         <div className={styles.expiryRow}>

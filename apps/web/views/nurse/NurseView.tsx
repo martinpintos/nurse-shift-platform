@@ -14,14 +14,12 @@ import {
 import {
   useCallback,
   useId,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
 } from "react";
-import {
-  NURSE_CANCEL_OPTIONS,
-  ShiftCancelControl,
-} from "../../components/ShiftCancelControl";
+import { ShiftCancelControl } from "../../components/ShiftCancelControl";
 import {
   ShiftHours,
   byDateAndTime,
@@ -31,9 +29,11 @@ import {
 } from "../../components/ShiftSummary";
 import { TimesheetTable } from "../../components/TimesheetTable";
 import { Panel } from "../../components/shell/Panel";
-import { StatusBadge } from "../../components/ui/Badge";
+import { useShell } from "../../components/shell/ShellContext";
+import { ROLE_SECTIONS } from "../../components/shell/sections";
+import { Badge, StatusBadge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { Input, Select } from "../../components/ui/Field";
+import { Field, Input, Select } from "../../components/ui/Field";
 import { ListGroupHeader, ListPanel } from "../../components/ui/List";
 import {
   EmptyState,
@@ -44,14 +44,15 @@ import {
 } from "../../components/ui/Section";
 import {
   BlockSkeleton,
+  ListFilterSkeleton,
   ListSkeleton,
+  Skeleton,
   TableSkeleton,
 } from "../../components/ui/Skeleton";
-import { IdText } from "../../components/ui/Text";
 import {
-  formatDay,
   formatHours,
   formatMinutes,
+  formatShiftDate,
   formatTimeRange,
 } from "../../lib/format";
 import { createLookup } from "../../lib/lookup";
@@ -78,19 +79,25 @@ function OpenShiftList({
 }) {
   const api = useApi();
   const { run, pending } = useAction();
+  const claimInFlight = useRef(false);
 
   async function claim(shift: Shift) {
-    if (pending) return;
-    const done = await run(
-      `claim:${shift.id}`,
-      () => api.claimShift(shift.id),
-      {
-        success: SUCCESS_MESSAGES.shiftClaimed,
-        apply: onClaimed,
-      },
-    );
-    // A failed claim may mean someone else just took it: show the current list.
-    if (!done) onRefresh();
+    if (claimInFlight.current) return;
+    claimInFlight.current = true;
+    try {
+      const done = await run(
+        `claim:${shift.id}`,
+        () => api.claimShift(shift.id),
+        {
+          success: SUCCESS_MESSAGES.shiftClaimed,
+          apply: onClaimed,
+        },
+      );
+      // A failed claim may mean someone else just took it: show the current list.
+      if (!done) onRefresh();
+    } finally {
+      claimInFlight.current = false;
+    }
   }
 
   const days = [...new Set(shifts.map((shift) => shift.date))];
@@ -107,12 +114,11 @@ function OpenShiftList({
                   key={shift.id}
                   className={styles.openRow}
                   data-testid={TEST_IDS.shiftListItem}
+                  data-shift-id={shift.id}
                 >
                   <div className={styles.what}>
                     <strong className={styles.role}>{shift.role}</strong>
-                    <span className={styles.sub}>
-                      {shift.agencyName} <IdText>{shift.id}</IdText>
-                    </span>
+                    <span className={styles.sub}>{shift.agencyName}</span>
                   </div>
                   <div className={styles.when}>
                     <strong className="nums nowrap">
@@ -124,9 +130,10 @@ function OpenShiftList({
                     <Button
                       variant="primary"
                       className={styles.claim}
-                      busy={pending !== null}
+                      busy={claiming}
+                      aria-disabled={pending !== null || undefined}
                       data-testid={TEST_IDS.shiftClaimButton}
-                      aria-label={`Claim ${shiftLabel(shift)}`}
+                      aria-label={`${claiming ? "Claiming" : "Claim"} ${shiftLabel(shift)}`}
                       onClick={() => void claim(shift)}
                     >
                       {claiming ? "Claiming…" : "Claim shift"}
@@ -145,7 +152,7 @@ function OpenShiftList({
 function DayGroup({ day, children }: { day: string; children: ReactNode }) {
   return (
     <>
-      <ListGroupHeader>{formatDay(day)}</ListGroupHeader>
+      <ListGroupHeader>{formatShiftDate(day)}</ListGroupHeader>
       {children}
     </>
   );
@@ -163,8 +170,7 @@ function TimesheetEntryForm({
   const { run, pending } = useAction();
   const [actualStart, setActualStart] = useState(shift.startTime);
   const [actualEnd, setActualEnd] = useState(shift.endTime);
-  const startId = useId();
-  const endId = useId();
+  const headingId = useId();
   const valid =
     actualStart !== "" && actualEnd !== "" && actualStart !== actualEnd;
 
@@ -183,49 +189,54 @@ function TimesheetEntryForm({
   }
 
   return (
-    <form className={styles.timesheetForm} onSubmit={onSubmit}>
-      <span className={styles.formLabel} aria-hidden="true">
-        Hours worked
-      </span>
-      <label htmlFor={startId} className="visually-hidden">
-        Start
-      </label>
-      <Input
-        id={startId}
-        size="sm"
-        type="time"
-        required
-        className={styles.time}
-        value={actualStart}
-        onChange={(event) => setActualStart(event.target.value)}
-      />
-      <span aria-hidden="true" className={styles.dash}>
-        –
-      </span>
-      <label htmlFor={endId} className="visually-hidden">
-        End
-      </label>
-      <Input
-        id={endId}
-        size="sm"
-        type="time"
-        required
-        className={styles.time}
-        value={actualEnd}
-        onChange={(event) => setActualEnd(event.target.value)}
-      />
-      <span className={styles.total} aria-live="off">
-        {valid ? formatMinutes(timesheetMinutes(actualStart, actualEnd)) : "—"}
-      </span>
-      <Button
-        type="submit"
-        size="sm"
-        variant="secondary"
-        busy={pending !== null}
-        aria-label={`Submit timesheet for ${shiftLabel(shift)}`}
-      >
-        {pending ? "Submitting…" : "Submit timesheet"}
-      </Button>
+    <form
+      className={styles.timesheetForm}
+      onSubmit={onSubmit}
+      aria-labelledby={headingId}
+    >
+      <h3 id={headingId}>Hours worked</h3>
+      <div className={styles.timeFields}>
+        <Field label="Actual start">
+          {({ id }) => (
+            <Input
+              id={id}
+              type="time"
+              required
+              value={actualStart}
+              onChange={(event) => setActualStart(event.target.value)}
+            />
+          )}
+        </Field>
+        <Field label="Actual end">
+          {({ id }) => (
+            <Input
+              id={id}
+              type="time"
+              required
+              value={actualEnd}
+              onChange={(event) => setActualEnd(event.target.value)}
+            />
+          )}
+        </Field>
+      </div>
+      <div className={styles.timesheetFooter}>
+        <p className={styles.total}>
+          Total worked{" "}
+          <strong className="nums">
+            {valid
+              ? formatMinutes(timesheetMinutes(actualStart, actualEnd))
+              : "Unavailable"}
+          </strong>
+          {valid && actualEnd < actualStart ? <span>Ends next day</span> : null}
+        </p>
+        <Button
+          type="submit"
+          busy={pending !== null}
+          aria-label={`Submit timesheet for ${shiftLabel(shift)}`}
+        >
+          {pending ? "Submitting…" : "Submit timesheet"}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -233,16 +244,18 @@ function TimesheetEntryForm({
 function MyShiftList({
   shifts,
   timesheets,
+  timesheetsReady,
   onCancelled,
   onTimesheetSubmitted,
 }: {
   shifts: Shift[];
   timesheets: Timesheet[];
+  timesheetsReady: boolean;
   onCancelled: (result: CancelShiftResponse) => void;
   onTimesheetSubmitted: (timesheet: Timesheet) => void;
 }) {
   return (
-    <ListPanel label="Your claimed shifts">
+    <ul className={styles.myList} aria-label="Your claimed shifts" role="list">
       {shifts.map((shift) => {
         const timesheet = timesheets.find(
           (entry) => entry.shiftId === shift.id,
@@ -251,47 +264,46 @@ function MyShiftList({
           <li key={shift.id} className={styles.myRow}>
             <div className={styles.myTop}>
               <div className={styles.myWhen}>
-                <strong className="nowrap">{formatDay(shift.date)}</strong>
+                <strong>{formatShiftDate(shift.date)}</strong>
                 <span className={styles.sub}>
                   <ShiftHours shift={shift} />
                 </span>
               </div>
               <div className={styles.what}>
                 <strong className={styles.role}>{shift.role}</strong>
-                <span className={styles.sub}>
-                  {shift.agencyName} <IdText>{shift.id}</IdText>
-                </span>
+                <span className={styles.sub}>{shift.agencyName}</span>
               </div>
-              <StatusBadge kind="shift" status={shift.status} />
+              <Badge tone="success" className={styles.claimed}>
+                Claimed
+              </Badge>
             </div>
-            <div className={styles.myActions}>
-              {timesheet ? (
-                <p className={styles.timesheetDone}>
-                  <span className={styles.formLabel}>Timesheet</span>
-                  <StatusBadge kind="timesheet" status={timesheet.status} />
-                  <span className="nums muted">
-                    {formatHours(timesheet.actualStart, timesheet.actualEnd)}
-                  </span>
-                </p>
-              ) : shift.status === "filled" ? (
+            {timesheet ? (
+              <p className={styles.timesheetDone}>
+                <span>Timesheet</span>
+                <StatusBadge kind="timesheet" status={timesheet.status} />
+                <span className="nums muted">
+                  {formatHours(timesheet.actualStart, timesheet.actualEnd)}
+                </span>
+              </p>
+            ) : timesheetsReady ? (
+              <>
                 <TimesheetEntryForm
                   shift={shift}
                   onSubmitted={onTimesheetSubmitted}
                 />
-              ) : null}
-              {shift.status === "filled" ? (
-                <ShiftCancelControl
-                  shiftId={shift.id}
-                  shiftLabel={shiftLabel(shift)}
-                  options={NURSE_CANCEL_OPTIONS}
-                  onCancelled={onCancelled}
-                />
-              ) : null}
-            </div>
+                <div className={styles.cancelFooter}>
+                  <ShiftCancelControl
+                    shiftId={shift.id}
+                    shiftLabel={shiftLabel(shift)}
+                    onCancelled={onCancelled}
+                  />
+                </div>
+              </>
+            ) : null}
           </li>
         );
       })}
-    </ListPanel>
+    </ul>
   );
 }
 
@@ -302,6 +314,10 @@ function MyShiftList({
 export function NurseView() {
   const user = useCurrentUser();
   const api = useApi();
+  const activePanel = useShell()?.activePanel;
+  const mobileTitle = ROLE_SECTIONS.nurse.find(
+    (section) => section.id === activePanel && section.id !== "open-shifts",
+  )?.label;
   const shifts = useResource(useCallback(() => api.listShifts(), [api]));
   const timesheets = useResource(
     useCallback(() => api.listTimesheets(), [api]),
@@ -354,11 +370,11 @@ export function NurseView() {
   const license = credentials.data
     ? currentCredential(credentials.data.credentials)
     : undefined;
-  const finding = shifts.loading
-    ? null
-    : `${open.length} open ${open.length === 1 ? "shift" : "shifts"} across ${
-        new Set(open.map((shift) => shift.agencyId)).size
-      } ${new Set(open.map((shift) => shift.agencyId)).size === 1 ? "agency" : "agencies"}`;
+  const openAgencyCount = new Set(open.map((shift) => shift.agencyId)).size;
+  const finding =
+    open.length > 0
+      ? `${open.length} open ${open.length === 1 ? "shift" : "shifts"} across ${openAgencyCount} ${openAgencyCount === 1 ? "agency" : "agencies"}`
+      : null;
 
   const filters = (
     <div className={styles.filters}>
@@ -400,14 +416,17 @@ export function NurseView() {
   return (
     <PageStack>
       <PageHeader
-        title="Shifts"
+        title="Find shifts"
+        mobileTitle={mobileTitle}
         meta={
-          finding ? (
+          shifts.loading ? (
+            <Skeleton width={152} height={20} />
+          ) : finding || license?.status === "expired" ? (
             <>
-              <span>{finding}</span>
+              {finding ? <span>{finding}</span> : null}
               {license?.status === "expired" ? (
                 <span className={styles.metaAlert}>
-                  · Your license has expired
+                  {finding ? "· " : ""}Your license has expired
                 </span>
               ) : null}
             </>
@@ -419,19 +438,40 @@ export function NurseView() {
         <Section
           id="open-shifts"
           title="Open shifts"
-          count={shifts.loading ? undefined : visibleOpen.length}
-          actions={filters}
+          fullWidthMobileActions
+          count={shifts.data ? visibleOpen.length : undefined}
+          actions={
+            shifts.loading ? (
+              <ListFilterSkeleton />
+            ) : open.length > 0 ? (
+              filters
+            ) : undefined
+          }
         >
           {shifts.error ? (
             <LoadError message={shifts.error} onRetry={shifts.reload} />
           ) : null}
           {shifts.loading ? (
-            <ListSkeleton label="open shifts" rows={2} />
-          ) : visibleOpen.length === 0 ? (
-            <EmptyState>
+            <ListSkeleton label="open shifts" rows={2} dated />
+          ) : !shifts.data ? null : visibleOpen.length === 0 ? (
+            <EmptyState
+              action={
+                open.length > 0 ? (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setAgency(ALL);
+                      setRole(ALL);
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : undefined
+              }
+            >
               {open.length === 0
-                ? "No open shifts right now. New postings show up here."
-                : "No open shifts match these filters."}
+                ? "No open shifts right now."
+                : "No shifts match these filters."}
             </EmptyState>
           ) : (
             <OpenShiftList
@@ -447,18 +487,24 @@ export function NurseView() {
         <Section
           id="my-shifts"
           title="My shifts"
-          count={shifts.loading ? undefined : mine.length}
+          hideMobileHeading
+          count={shifts.data ? mine.length : undefined}
         >
+          {shifts.error ? (
+            <LoadError message={shifts.error} onRetry={shifts.reload} />
+          ) : null}
+          {mine.length > 0 && timesheets.error ? (
+            <LoadError message={timesheets.error} onRetry={timesheets.reload} />
+          ) : null}
           {shifts.loading ? (
             <ListSkeleton label="your shifts" rows={1} />
-          ) : mine.length === 0 ? (
-            <EmptyState>
-              You haven’t claimed any shifts yet. Claimed shifts show up here.
-            </EmptyState>
+          ) : !shifts.data ? null : mine.length === 0 ? (
+            <EmptyState>You haven’t claimed any shifts yet.</EmptyState>
           ) : (
             <MyShiftList
               shifts={mine}
               timesheets={myTimesheets}
+              timesheetsReady={Boolean(timesheets.data)}
               onCancelled={applyShift}
               onTimesheetSubmitted={addTimesheet}
             />
@@ -467,7 +513,7 @@ export function NurseView() {
       </Panel>
 
       <Panel id="license">
-        <Section id="license" title="License" variant="card">
+        <Section id="license" title="License" variant="card" hideMobileHeading>
           {credentials.error ? (
             <LoadError
               message={credentials.error}
@@ -476,12 +522,12 @@ export function NurseView() {
           ) : null}
           {credentials.loading ? (
             <BlockSkeleton label="your license" lines={4} />
-          ) : (
+          ) : credentials.data ? (
             <CredentialsPanel
-              credentials={credentials.data?.credentials ?? []}
+              credentials={credentials.data.credentials}
               onUploaded={addCredential}
             />
-          )}
+          ) : null}
         </Section>
       </Panel>
 
@@ -489,20 +535,21 @@ export function NurseView() {
         <Section
           id="timesheets"
           title="Timesheets"
-          count={timesheets.loading ? undefined : myTimesheets.length}
+          hideMobileHeading
+          count={timesheets.data ? myTimesheets.length : undefined}
         >
           {timesheets.error ? (
             <LoadError message={timesheets.error} onRetry={timesheets.reload} />
           ) : null}
           {timesheets.loading ? (
             <TableSkeleton label="timesheets" rows={2} columns={5} />
-          ) : (
+          ) : timesheets.data ? (
             <TimesheetTable
               timesheets={myTimesheets}
               lookup={lookup}
               showNurse={false}
             />
-          )}
+          ) : null}
         </Section>
       </Panel>
     </PageStack>

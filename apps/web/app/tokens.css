@@ -23,7 +23,8 @@
   --color-text-muted: #5b6576;
   --color-text-subtle: #7a8494;
 
-  /* Primary (blue, as in docs/design) */
+  /* Brand and primary action */
+  --color-brand: #0f1f3a;
   --color-primary: #1d4ed8;
   --color-primary-hover: #1e40af;
   --color-primary-active: #1e3a8a;
@@ -32,13 +33,12 @@
   --color-on-primary: #ffffff;
 
   /* Navy shell */
-  --color-shell: #0f1f3a;
+  --color-shell: var(--color-brand);
   --color-shell-raised: #1a2d4f;
   --color-shell-active: #1f3a68;
   --color-shell-border: #253a5e;
   --color-shell-text: #e6ecf5;
   --color-shell-muted: #9fb0c9;
-  --color-shell-accent: #3b82f6;
 
   /* Status tones: soft background, text (AA on the soft background), border, dot */
   --tone-warning-bg: #fff4e0;
@@ -138,6 +138,6 @@
 @media (max-width: 959.98px) {
   :root {
     --gutter: var(--space-4);
-    --section-gap: var(--space-6);
+    --section-gap: var(--space-4);
   }
 }

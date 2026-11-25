@@ -9,10 +9,9 @@ const LOCALE = "en-US";
 // Shift dates are calendar dates, facility-local. Format them in UTC so 2026-10-02 never
 // shows as the 1st west of UTC.
 const shiftDateFormat = new Intl.DateTimeFormat(LOCALE, {
-  weekday: "short",
-  month: "short",
+  weekday: "long",
+  month: "long",
   day: "numeric",
-  year: "numeric",
   timeZone: "UTC",
 });
 
@@ -69,7 +68,7 @@ function utcDate(isoDate: string): Date {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-/** `2026-10-02` → `Fri, Oct 2, 2026`. */
+/** `2026-10-02` → `Friday, October 2`. */
 export function formatShiftDate(isoDate: string): string {
   return shiftDateFormat.format(utcDate(isoDate));
 }
@@ -128,9 +127,9 @@ export function isOvernight(startTime: string, endTime: string): boolean {
   return endTime < startTime;
 }
 
-/** `19:00`, `07:00` → `19:00–07:00`. Times are 24-hour, facility-local. */
+/** `19:00`, `07:00` → `19:00 to 07:00`. Times are 24-hour, facility-local. */
 export function formatTimeRange(startTime: string, endTime: string): string {
-  return `${startTime}–${endTime}`;
+  return `${startTime} to ${endTime}`;
 }
 
 /** The calendar date a shift ends on: the next day for an overnight shift. */
@@ -145,10 +144,10 @@ export function shiftEndDate(
   return next.toISOString().slice(0, 10);
 }
 
-/** `19:00–07:00 +1` for an overnight shift, `07:00–19:00` otherwise. */
+/** Includes the next-day ending when the shift runs overnight. */
 export function formatHours(startTime: string, endTime: string): string {
   const range = formatTimeRange(startTime, endTime);
-  return isOvernight(startTime, endTime) ? `${range} +1` : range;
+  return isOvernight(startTime, endTime) ? `${range} (next day)` : range;
 }
 
 /** 720 → `12 h`, 690 → `11 h 30 min`. */

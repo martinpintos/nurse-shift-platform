@@ -1,8 +1,8 @@
 import type { Shift } from "@repo/shared";
 import {
-  formatDay,
   formatHours,
   formatShiftDate,
+  formatTimeRange,
   isOvernight,
   shiftEndDate,
   shiftLength,
@@ -41,31 +41,28 @@ export function byDateAndTime(
   return a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime);
 }
 
-/** "RN shift shift-1 on Fri, Oct 2, 2026": spoken context for row-level buttons. */
+/** Spoken context for row-level actions. */
 export function shiftLabel(shift: Shift): string {
-  return `${shift.role} shift ${shift.id} on ${formatShiftDate(shift.date)}`;
+  return `${shift.role} shift at ${shift.agencyName} on ${formatShiftDate(shift.date)}, ${formatTimeRange(shift.startTime, shift.endTime)}`;
 }
 
-/** "Ends Sat, Oct 3" for an overnight shift, "12 h" for a day shift. */
+/** The end date for an overnight shift, or the scheduled duration for a day shift. */
 export function shiftEndNote(
   shift: Pick<Shift, "date" | "startTime" | "endTime">,
 ): string {
   return isOvernight(shift.startTime, shift.endTime)
-    ? `Ends ${formatDay(shiftEndDate(shift.date, shift.startTime, shift.endTime))}`
+    ? `Ends ${formatShiftDate(shiftEndDate(shift.date, shift.startTime, shift.endTime))}`
     : shiftLength(shift.startTime, shift.endTime);
 }
 
-/** "19:00–07:00 +1" with the length for screen readers and on hover. */
+/** The scheduled hours with their duration available on hover. */
 export function ShiftHours({
   shift,
 }: {
   shift: Pick<Shift, "startTime" | "endTime">;
 }) {
   return (
-    <span
-      className="nums nowrap"
-      title={shiftLength(shift.startTime, shift.endTime)}
-    >
+    <span className="nums" title={shiftLength(shift.startTime, shift.endTime)}>
       {formatHours(shift.startTime, shift.endTime)}
     </span>
   );

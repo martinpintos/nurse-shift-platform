@@ -12,6 +12,11 @@ const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
 });
+const roboto = localFont({
+  src: "./fonts/Roboto-Latin.woff2",
+  variable: "--font-roboto",
+  weight: "100 900",
+});
 
 export const metadata: Metadata = {
   title: { default: "ShiftPatch", template: "%s · ShiftPatch" },
@@ -21,7 +26,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  // Light theme only; the mobile top bar is navy.
   themeColor: "#0f1f3a",
 };
 
@@ -32,7 +36,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable}`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

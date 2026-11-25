@@ -88,7 +88,7 @@ describe("AgencyView", () => {
       "GET /api/agencies/agency-a/shifts": () => new Promise(() => {}),
     });
     expect(await screen.findByText("Loading your shifts")).toBeTruthy();
-    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Your shifts" })).toBeNull();
   });
 
   it("posts a shift with valid defaults: open the form, then one click on submit", async () => {
@@ -200,6 +200,7 @@ describe("AgencyView", () => {
   it("offers cancel only on filled shifts, defaulting to no-show, with one click", async () => {
     const confirm = vi.spyOn(window, "confirm");
     const { api } = renderAgency({
+      "GET /api/timesheets": { timesheets: [], refs },
       "POST /api/shifts/shift-2/cancel": {
         ...shift2,
         status: "open",
@@ -242,6 +243,7 @@ describe("AgencyView", () => {
 
   it("sends the reason picked in the select", async () => {
     const { api } = renderAgency({
+      "GET /api/timesheets": { timesheets: [], refs },
       "POST /api/shifts/shift-2/cancel": {
         ...shift2,
         status: "open",

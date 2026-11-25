@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatDay, formatHours, formatRelative, shiftEndDate } from "./format";
+import {
+  formatDay,
+  formatHours,
+  formatRelative,
+  formatShiftDate,
+  shiftEndDate,
+} from "./format";
 
 describe("formatRelative", () => {
   const now = new Date("2026-11-25T12:00:00.000Z");
@@ -17,8 +23,8 @@ describe("formatRelative", () => {
 
 describe("shift times", () => {
   it("marks overnight hours and the next-day end", () => {
-    expect(formatHours("19:00", "07:00")).toBe("19:00–07:00 +1");
-    expect(formatHours("07:00", "19:00")).toBe("07:00–19:00");
+    expect(formatHours("19:00", "07:00")).toBe("19:00 to 07:00 (next day)");
+    expect(formatHours("07:00", "19:00")).toBe("07:00 to 19:00");
     expect(shiftEndDate("2026-10-02", "19:00", "07:00")).toBe("2026-10-03");
     expect(shiftEndDate("2026-12-31", "19:00", "07:00")).toBe("2027-01-01");
     expect(shiftEndDate("2026-10-03", "07:00", "19:00")).toBe("2026-10-03");
@@ -26,5 +32,6 @@ describe("shift times", () => {
 
   it("formats a calendar day without the year, in UTC", () => {
     expect(formatDay("2026-10-02")).toBe("Fri, Oct 2");
+    expect(formatShiftDate("2026-10-02")).toBe("Friday, October 2");
   });
 });

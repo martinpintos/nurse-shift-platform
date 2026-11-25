@@ -1,7 +1,7 @@
 import type { AuditLogEntry } from "@repo/shared";
 import { describe, expect, it } from "vitest";
 import { refs } from "../test/fixtures";
-import { describeActivity } from "./activity";
+import { describeActivity, type ActivityLine } from "./activity";
 import { createLookup } from "./lookup";
 
 const lookup = createLookup({ refs });
@@ -21,16 +21,28 @@ function entry(overrides: Partial<AuditLogEntry>): AuditLogEntry {
   };
 }
 
+function sentenceText(line: ActivityLine): string {
+  return line.sentence
+    .map((part) => (typeof part === "string" ? part : part.emphasis))
+    .join("");
+}
+
 describe("describeActivity", () => {
-  it("names the nurse, the shift, its role and agency", () => {
-    expect(describeActivity(entry({}), lookup)).toEqual({
-      title: "Shift claimed",
-      sentence: "Maria Lopez claimed shift-2, LPN at Sunrise Health Staffing",
-    });
+  it("emphasizes the nurse, role and agency in the claim description", () => {
+    const line = describeActivity(entry({}), lookup);
+    expect(line.title).toBe("Shift claimed");
+    expect(sentenceText(line)).toBe(
+      "Maria Lopez claimed shift-2, LPN at Sunrise Health Staffing",
+    );
+    expect(line.sentence.filter((part) => typeof part !== "string")).toEqual([
+      { emphasis: "Maria Lopez" },
+      { emphasis: "LPN" },
+      { emphasis: "Sunrise Health Staffing" },
+    ]);
   });
 
   it("falls back to ids when no names are known", () => {
-    expect(describeActivity(entry({}), bare).sentence).toBe(
+    expect(sentenceText(describeActivity(entry({}), bare))).toBe(
       "nurse-1 claimed shift-2",
     );
   });
@@ -46,7 +58,7 @@ describe("describeActivity", () => {
         previousNurseId: "nurse-1",
       },
     });
-    expect(describeActivity(noShow, lookup).sentence).toBe(
+    expect(sentenceText(describeActivity(noShow, lookup))).toBe(
       "Sunrise Health Staffing reported Maria Lopez as a no-show on shift-2, LPN at Sunrise Health Staffing",
     );
     const own = entry({
@@ -57,7 +69,7 @@ describe("describeActivity", () => {
         previousNurseId: "nurse-1",
       },
     });
-    expect(describeActivity(own, lookup).sentence).toBe(
+    expect(sentenceText(describeActivity(own, lookup))).toBe(
       "Maria Lopez cancelled shift-2, LPN at Sunrise Health Staffing in advance",
     );
   });
@@ -120,6 +132,6 @@ describe("describeActivity", () => {
       "Alex Kim exported 2 license documents for 1 nurse",
     ],
   ])("%#: %s", (input, sentence) => {
-    expect(describeActivity(input, lookup).sentence).toBe(sentence);
+    expect(sentenceText(describeActivity(input, lookup))).toBe(sentence);
   });
 });

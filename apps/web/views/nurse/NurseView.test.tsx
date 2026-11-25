@@ -69,9 +69,10 @@ describe("NurseView: shifts", () => {
     const items = await screen.findAllByTestId(TEST_IDS.shiftListItem);
 
     expect(items).toHaveLength(2);
-    expect(
-      items.map((item) => within(item).getByText(/^shift-/).textContent),
-    ).toEqual(["shift-1", "shift-3"]);
+    expect(items.map((item) => item.dataset.shiftId)).toEqual([
+      "shift-1",
+      "shift-3",
+    ]);
     for (const item of items) {
       expect(
         within(item).getAllByTestId(TEST_IDS.shiftClaimButton),
@@ -81,7 +82,10 @@ describe("NurseView: shifts", () => {
 
     const claimed = within(myShifts()).getAllByRole("listitem");
     expect(claimed).toHaveLength(1);
-    expect(within(claimed[0]!).getByText("shift-2")).toBeTruthy();
+    expect(
+      within(claimed[0]!).getByText("Saturday, October 3"),
+    ).toBeTruthy();
+    expect(screen.queryByText(/^shift-\d+$/)).toBeNull();
     expect(
       within(myShifts()).getAllByTestId(TEST_IDS.shiftCancelButton),
     ).toHaveLength(1);
@@ -111,7 +115,7 @@ describe("NurseView: shifts", () => {
     // shift-1 left the open list at once; shift-3 is still open. No reload.
     const items = screen.getAllByTestId(TEST_IDS.shiftListItem);
     expect(items).toHaveLength(1);
-    expect(within(items[0]!).getByText("shift-3")).toBeTruthy();
+    expect(items[0]?.dataset.shiftId).toBe("shift-3");
     expect(api.callsTo("GET /api/shifts")).toHaveLength(1);
     // A new banner message doesn't re-check the session or reload unrelated data.
     expect(api.callsTo("GET /api/auth/me")).toHaveLength(1);
@@ -119,6 +123,29 @@ describe("NurseView: shifts", () => {
     expect(
       within(myShifts()).getAllByTestId(TEST_IDS.shiftCancelButton),
     ).toHaveLength(2);
+  });
+
+  it("only shows a busy state on the shift being claimed", async () => {
+    let resolveClaim!: (response: Response) => void;
+    const claim = new Promise<Response>((resolve) => {
+      resolveClaim = resolve;
+    });
+    const { api } = renderNurse({
+      "POST /api/shifts/shift-1/claim": () => claim,
+    });
+    const [first, second] = await screen.findAllByTestId(
+      TEST_IDS.shiftClaimButton,
+    );
+
+    fireEvent.click(first!);
+    expect(first?.getAttribute("data-busy")).toBe("true");
+    expect(second?.hasAttribute("data-busy")).toBe(false);
+    expect(second?.textContent).toBe("Claim shift");
+    fireEvent.click(second!);
+    expect(api.callsTo("POST /api/shifts/shift-3/claim")).toHaveLength(0);
+
+    resolveClaim(errorResponse(409, ERROR_MESSAGES.shiftAlreadyFilled));
+    await expectBanner(ERROR_MESSAGES.shiftAlreadyFilled, "error");
   });
 
   it("claims and then immediately cancels the same shift", async () => {
@@ -140,7 +167,7 @@ describe("NurseView: shifts", () => {
     // The very next click acts on the state the claim returned.
     fireEvent.click(
       within(myShifts()).getByRole("button", {
-        name: /Cancel RN shift shift-1/,
+        name: /Cancel RN shift at Sunrise Health Staffing/,
       }),
     );
     await expectBanner("Shift cancelled", "success");
@@ -185,15 +212,8 @@ describe("NurseView: shifts", () => {
     });
     await screen.findAllByTestId(TEST_IDS.shiftListItem);
 
-    const reason = within(myShifts()).getByRole("combobox", {
-      name: /cancellation reason/i,
-    }) as HTMLSelectElement;
-    expect(reason.value).toBe("advance");
-    // No-show is a staff action: shown for context, not selectable.
-    const noShow = within(reason).getByRole("option", {
-      name: /no-show/i,
-    }) as HTMLOptionElement;
-    expect(noShow.disabled).toBe(true);
+    expect(within(myShifts()).queryByRole("combobox")).toBeNull();
+    expect(within(myShifts()).queryByText(/no-show/i)).toBeNull();
 
     fireEvent.click(within(myShifts()).getByTestId(TEST_IDS.shiftCancelButton));
 
@@ -231,9 +251,11 @@ describe("NurseView: timesheets", () => {
     await screen.findAllByTestId(TEST_IDS.shiftListItem);
 
     const start = within(myShifts()).getByLabelText(
-      "Start",
+      "Actual start",
     ) as HTMLInputElement;
-    const end = within(myShifts()).getByLabelText("End") as HTMLInputElement;
+    const end = within(myShifts()).getByLabelText(
+      "Actual end",
+    ) as HTMLInputElement;
     expect([start.value, end.value]).toEqual(["07:00", "19:00"]);
 
     fireEvent.click(
@@ -241,6 +263,9 @@ describe("NurseView: timesheets", () => {
     );
 
     await expectBanner("Timesheet submitted", "success");
+    expect(
+      within(myShifts()).queryByTestId(TEST_IDS.shiftCancelButton),
+    ).toBeNull();
     expect(api.callsTo("POST /api/timesheets")[0]?.body).toEqual({
       shiftId: "shift-2",
       actualStart: "07:00",

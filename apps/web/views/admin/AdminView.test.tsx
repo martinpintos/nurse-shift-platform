@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RequireRole } from "../../components/RoleRouting";
-import type { RouteHandler } from "../../test/fetch-mock";
+import {
+  errorResponse,
+  jsonResponse,
+  type RouteHandler,
+} from "../../test/fetch-mock";
 import {
   admin,
   adminShifts,
@@ -85,13 +89,14 @@ describe("AdminView", () => {
     // shift-1's history: one no-show.
     expect(within(rows[0]!).getByText("1 no-show")).toBeTruthy();
 
-    // Cancel only on the filled row.
+    // Open shifts and shifts with a submitted timesheet cannot be cancelled.
     expect(
       within(rows[0]!).queryByTestId(TEST_IDS.shiftCancelButton),
     ).toBeNull();
     expect(
-      within(rows[1]!).getAllByTestId(TEST_IDS.shiftCancelButton),
-    ).toHaveLength(1);
+      within(rows[1]!).queryByTestId(TEST_IDS.shiftCancelButton),
+    ).toBeNull();
+    expect(within(rows[1]!).getByText("Timesheet submitted")).toBeTruthy();
     expect(
       within(rows[2]!).queryByTestId(TEST_IDS.shiftCancelButton),
     ).toBeNull();
@@ -100,19 +105,62 @@ describe("AdminView", () => {
     expect(screen.getByText("Your shift was cancelled")).toBeTruthy();
   });
 
-  it("shows the audit log as plain sentences with names", async () => {
+  it("emphasizes names, roles and agencies in the audit log", async () => {
     renderAdmin();
     const log = await screen.findByTestId(TEST_IDS.auditLogTable);
     expect(within(log).getByText("Shift cancelled")).toBeTruthy();
+    const [, description] = within(log).getAllByRole("cell");
+    expect(description?.textContent).toBe(
+      "Sunrise Health Staffing reported James Cook as a no-show on shift-1, RN at Sunrise Health Staffing",
+    );
     expect(
-      within(log).getByText(
-        "Sunrise Health Staffing reported James Cook as a no-show on shift-1, RN at Sunrise Health Staffing",
+      [...description!.querySelectorAll("strong")].map(
+        (part) => part.textContent,
       ),
-    ).toBeTruthy();
+    ).toEqual([
+      "Sunrise Health Staffing",
+      "James Cook",
+      "RN",
+      "Sunrise Health Staffing",
+    ]);
     expect(within(log).queryByText(/nurse-2|agency-a/)).toBeNull();
     // A relative time, with the full date on hover.
     const time = log.querySelector("time");
     expect(time?.getAttribute("title")).toMatch(/2026/);
+  });
+
+  it("shows outbox subjects with a secondary shift reference and emphasizes the recipient name", async () => {
+    renderAdmin({
+      "GET /api/admin/outbox": {
+        messages: [
+          {
+            ...outboxMessage,
+            template: "shift.claimed",
+            subject: "You claimed shift shift-1",
+          },
+          {
+            ...outboxMessage,
+            id: "out-2",
+            template: "shift.claimed",
+            subject: "Shift shift-1 was claimed",
+            recipientId: "agency-a",
+            recipientEmail: "admin@sunrisehealth.example",
+          },
+        ],
+        refs,
+      },
+    });
+    const list = await screen.findByRole("list", { name: /Notifications/ });
+    const [toNurse, toAgency] = within(list).getAllByRole("listitem");
+    expect(toNurse?.textContent).toContain("You claimed a shift (shift-1)");
+    expect(toAgency?.textContent).toContain("Shift claimed (shift-1)");
+    expect(within(toNurse!).getByText("James Cook").tagName).toBe("STRONG");
+    expect(
+      within(toNurse!).getByText(outboxMessage.recipientEmail).tagName,
+    ).toBe("SPAN");
+    expect(within(toAgency!).getByText("Sunrise Health Staffing").tagName).toBe(
+      "STRONG",
+    );
   });
 
   it("leads with coverage KPIs computed from the shifts", async () => {
@@ -166,7 +214,7 @@ describe("AdminView", () => {
       vi.advanceTimersByTime(POLL_INTERVAL_MS * 4);
     });
     for (const feed of FEEDS) expect(count(feed)).toBe(3);
-    expect(screen.getByText(/paused while this tab is hidden/i)).toBeTruthy();
+    expect(screen.getByText("Updates paused")).toBeTruthy();
 
     // Back in view: refresh at once, then resume the 5 s cadence.
     setVisibility("visible");
@@ -192,9 +240,66 @@ describe("AdminView", () => {
     expect(api.callsTo("GET /api/admin/shifts")).toHaveLength(1);
   });
 
+  it("keeps connecting while an initial server error gets one quick retry", async () => {
+    let attempts = 0;
+    let resolveRetry!: (response: Response) => void;
+    const retryResponse = new Promise<Response>((resolve) => {
+      resolveRetry = resolve;
+    });
+    const { api } = renderAdmin({
+      "GET /api/admin/shifts": () => {
+        attempts += 1;
+        return attempts === 1
+          ? errorResponse(500, "Internal server error")
+          : retryResponse;
+      },
+    });
+
+    await waitFor(() =>
+      expect(api.callsTo("GET /api/admin/shifts")).toHaveLength(2),
+    );
+    expect(screen.getByText("Connecting…")).toBeTruthy();
+    expect(screen.queryByText("Updates delayed")).toBeNull();
+    expect(screen.queryByText(/Internal server error/)).toBeNull();
+
+    await act(async () =>
+      resolveRetry(jsonResponse({ shifts: adminShifts, refs })),
+    );
+    expect(await screen.findByText("Live", { exact: true })).toBeTruthy();
+  });
+
+  it("keeps the last coverage data visible when a refresh fails and returns to Live on recovery", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const { api } = renderAdmin();
+    await screen.findByText("Live", { exact: true });
+    const table = screen.getByTestId(TEST_IDS.adminDashboardShiftTable);
+
+    api.set("GET /api/admin/shifts", () =>
+      errorResponse(503, "Feed unavailable"),
+    );
+    await act(async () => vi.advanceTimersByTime(POLL_INTERVAL_MS));
+    expect(await screen.findByText("Updates delayed")).toBeTruthy();
+    expect(api.callsTo("GET /api/admin/shifts")).toHaveLength(3);
+    expect(screen.getByText(/Coverage last updated/)).toBeTruthy();
+    expect(screen.getByTestId(TEST_IDS.adminDashboardShiftTable)).toBe(table);
+
+    api.set("GET /api/admin/shifts", { shifts: adminShifts, refs });
+    await act(async () => vi.advanceTimersByTime(POLL_INTERVAL_MS));
+    expect(await screen.findByText("Live", { exact: true })).toBeTruthy();
+    expect(screen.queryByText(/Coverage last updated/)).toBeNull();
+  });
+
   it("cancels a filled shift with the default no-show reason in one click", async () => {
     const confirm = vi.spyOn(window, "confirm");
     const { api } = renderAdmin({
+      "GET /api/admin/shifts": {
+        shifts: adminShifts.map((shift) => ({
+          ...shift,
+          timesheetStatus: null,
+        })),
+        refs,
+      },
+      "GET /api/timesheets": { timesheets: [], refs },
       "POST /api/shifts/shift-2/cancel": {
         ...shift2,
         status: "open",

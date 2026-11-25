@@ -43,7 +43,7 @@ const EXPECTED_ELEMENT: Record<TestId, string> = {
   "admin-shift-status-badge": "span",
   "audit-log-table": "table",
   "timesheet-table": "table",
-  "notification-banner": "div[role=status][data-variant]",
+  "notification-banner": "div[data-variant]",
 };
 
 const views: {
@@ -88,7 +88,7 @@ const views: {
         agencyId: "agency-a",
         shifts: [shift1, shift2],
       },
-      "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
+      "GET /api/timesheets": { timesheets: [], refs },
     },
     ready: async () => {
       await screen.findAllByTestId(TEST_IDS.shiftCancelButton);

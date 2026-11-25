@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, expect, it } from "vitest";
 import { useResource } from "./use-resource";
 
@@ -14,9 +15,12 @@ function controllable() {
 describe("useResource", () => {
   it("loads, then applies a mutation at once", async () => {
     const { load, pending } = controllable();
-    const { result } = renderHook(() => useResource(load));
+    const { result } = renderHook(() => useResource(load), {
+      wrapper: StrictMode,
+    });
     expect(result.current.loading).toBe(true);
 
+    await waitFor(() => expect(pending).toHaveLength(1));
     await act(async () => pending[0]?.(["shift-1 open"]));
     expect(result.current.data).toEqual(["shift-1 open"]);
 
@@ -27,6 +31,7 @@ describe("useResource", () => {
   it("drops a load that was in flight when the mutation landed", async () => {
     const { load, pending } = controllable();
     const { result } = renderHook(() => useResource(load));
+    await waitFor(() => expect(pending).toHaveLength(1));
     await act(async () => pending[0]?.(["shift-1 open"]));
 
     // A poll starts, the user claims, then the stale poll answers.
@@ -47,6 +52,7 @@ describe("useResource", () => {
   it("ignores a mutation before the first load has data", async () => {
     const { load, pending } = controllable();
     const { result } = renderHook(() => useResource(load));
+    await waitFor(() => expect(pending).toHaveLength(1));
     act(() => result.current.mutate(() => ["never"]));
     expect(result.current.data).toBeUndefined();
     await act(async () => pending[0]?.(["loaded"]));

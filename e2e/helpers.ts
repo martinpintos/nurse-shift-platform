@@ -108,7 +108,7 @@ function idPattern(shiftId: string): RegExp {
 export function openShift(page: Page, shiftId: string): Locator {
   return page
     .getByTestId(TEST_IDS.shiftListItem)
-    .filter({ hasText: idPattern(shiftId) });
+    .and(page.locator(`[data-shift-id=${JSON.stringify(shiftId)}]`));
 }
 
 /** A row of the admin dashboard table, by shift id. */

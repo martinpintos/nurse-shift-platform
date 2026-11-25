@@ -10,10 +10,7 @@ import {
   type OutboxMessage,
 } from "@repo/shared";
 import { useCallback, useId, useState } from "react";
-import {
-  STAFF_CANCEL_OPTIONS,
-  ShiftCancelControl,
-} from "../../components/ShiftCancelControl";
+import { ShiftCancelControl } from "../../components/ShiftCancelControl";
 import {
   ShiftHours,
   byDateAndTime,
@@ -44,13 +41,14 @@ import {
 } from "../../components/ui/Skeleton";
 import { CellStack, EmptyRow, Table, Td, Th } from "../../components/ui/Table";
 import { Tabs, tabPanelProps } from "../../components/ui/Tabs";
-import { IdText } from "../../components/ui/Text";
 import { describeActivity } from "../../lib/activity";
+import { ApiError } from "../../lib/api";
 import { saveBlob } from "../../lib/download";
-import { formatDay } from "../../lib/format";
+import { formatDateTime, formatShiftDate } from "../../lib/format";
 import { createLookup, type Lookup } from "../../lib/lookup";
 import { useApi } from "../../lib/session";
 import { useAction } from "../../lib/use-action";
+import { useNow } from "../../lib/use-now";
 import { POLL_INTERVAL_MS, usePolling } from "../../lib/use-polling";
 import { useResource } from "../../lib/use-resource";
 import styles from "./AdminView.module.css";
@@ -66,6 +64,12 @@ const ALL_AGENCIES = "all";
 const RECENT_ACTIVITY = 8;
 /** Outbox messages shown before "Show all". */
 const RECENT_MESSAGES = 4;
+
+function retryAdminRead(error: unknown): boolean {
+  return (
+    error instanceof ApiError && [0, 500, 502, 503, 504].includes(error.status)
+  );
+}
 
 /** "1 no-show", "2 cancelled", or both: the shift's cancellation history in brief. */
 function historyNote(shift: AdminShift): string | null {
@@ -114,11 +118,7 @@ function CoverageTable({
               <tr key={shift.id}>
                 <Td label="Date">
                   <CellStack
-                    primary={
-                      <strong className="nowrap">
-                        {formatDay(shift.date)}
-                      </strong>
-                    }
+                    primary={<strong>{formatShiftDate(shift.date)}</strong>}
                     secondary={shift.id}
                   />
                 </Td>
@@ -138,7 +138,7 @@ function CoverageTable({
                       }
                     />
                   ) : (
-                    <span className="muted">—</span>
+                    <span className="muted">Unassigned</span>
                   )}
                 </Td>
                 <Td label="Status">
@@ -154,11 +154,13 @@ function CoverageTable({
                   </span>
                 </Td>
                 <Td end>
-                  {shift.status === "filled" && shift.claimedBy ? (
+                  {shift.status === "filled" &&
+                  shift.claimedBy &&
+                  !shift.timesheetStatus ? (
                     <ShiftCancelControl
                       shiftId={shift.id}
                       shiftLabel={shiftLabel(shift)}
-                      options={STAFF_CANCEL_OPTIONS}
+                      staff
                       onCancelled={onCancelled}
                     />
                   ) : null}
@@ -199,7 +201,17 @@ function ActivityTable({
                 <Td label="Activity">
                   <strong className="nowrap">{line.title}</strong>
                 </Td>
-                <Td label="What happened">{line.sentence}</Td>
+                <Td>
+                  <span className={styles.activitySentence}>
+                    {line.sentence.map((part, index) =>
+                      typeof part === "string" ? (
+                        part
+                      ) : (
+                        <strong key={index}>{part.emphasis}</strong>
+                      ),
+                    )}
+                  </span>
+                </Td>
                 <Td label="When" end className="muted nowrap">
                   <RelativeTime dateTime={entry.at} />
                 </Td>
@@ -212,6 +224,22 @@ function ActivityTable({
   );
 }
 
+/** Makes the demo's generated subjects easier to scan, including stored messages. */
+function outboxTitle({ subject, shiftId }: OutboxMessage): string {
+  switch (subject) {
+    case `You claimed shift ${shiftId}`:
+      return "You claimed a shift";
+    case `Shift ${shiftId} was claimed`:
+      return "Shift claimed";
+    case `Your claim on shift ${shiftId} was cancelled`:
+      return "Your shift claim was cancelled";
+    case `Shift ${shiftId} is open again`:
+      return "Shift reopened";
+    default:
+      return subject;
+  }
+}
+
 function OutboxList({
   messages,
   lookup,
@@ -221,22 +249,45 @@ function OutboxList({
 }) {
   return (
     <ListPanel label="Notifications, newest first">
-      {messages.map((message) => (
-        <li key={message.id} className={styles.message}>
-          <div className={styles.messageHead}>
-            <strong>{message.subject}</strong>
-            <RelativeTime
-              dateTime={message.createdAt}
-              className={styles.messageTime}
-            />
-          </div>
-          <p className={styles.messageTo}>
-            To {lookup.name(message.recipientId)}{" "}
-            <IdText>{message.recipientEmail}</IdText>
-          </p>
-          <p className={styles.messageBody}>{message.body}</p>
-        </li>
-      ))}
+      {messages.map((message) => {
+        const subject = outboxTitle(message);
+        return (
+          <li key={message.id} className={styles.message}>
+            <div className={styles.messageHead}>
+              <strong>
+                {subject}
+                {!subject.includes(message.shiftId) ? (
+                  <>
+                    {" "}
+                    <span className={styles.messageReference}>
+                      ({message.shiftId})
+                    </span>
+                  </>
+                ) : null}
+              </strong>
+              <RelativeTime
+                dateTime={message.createdAt}
+                className={styles.messageTime}
+              />
+            </div>
+            <p className={styles.messageTo}>
+              <span>
+                To
+                {lookup.knows(message.recipientId) ? (
+                  <>
+                    {" "}
+                    <strong>{lookup.name(message.recipientId)}</strong>
+                  </>
+                ) : null}
+              </span>{" "}
+              <span className={styles.messageEmail}>
+                {message.recipientEmail}
+              </span>
+            </p>
+            <p className={styles.messageBody}>{message.body}</p>
+          </li>
+        );
+      })}
     </ListPanel>
   );
 }
@@ -248,11 +299,21 @@ function OutboxList({
 export function AdminView() {
   const api = useApi();
   const { run, pending } = useAction();
-  const shifts = useResource(useCallback(() => api.adminShifts(), [api]));
-  const audit = useResource(useCallback(() => api.auditLog(), [api]));
-  const outbox = useResource(useCallback(() => api.outbox(), [api]));
+  const shifts = useResource(
+    useCallback(() => api.adminShifts(), [api]),
+    retryAdminRead,
+  );
+  const audit = useResource(
+    useCallback(() => api.auditLog(), [api]),
+    retryAdminRead,
+  );
+  const outbox = useResource(
+    useCallback(() => api.outbox(), [api]),
+    retryAdminRead,
+  );
   const timesheets = useResource(
     useCallback(() => api.listTimesheets(), [api]),
+    retryAdminRead,
   );
   const [tab, setTab] = useState<CoverageTab>("all");
   const [agency, setAgency] = useState(ALL_AGENCIES);
@@ -269,6 +330,22 @@ export function AdminView() {
   }
 
   const { paused } = usePolling(reloadAll);
+  const now = useNow(POLL_INTERVAL_MS);
+  const feeds = [shifts, audit, outbox, timesheets];
+  const delayed = feeds.some(
+    ({ error, updatedAt }) =>
+      error ||
+      (updatedAt &&
+        now.getTime() - updatedAt.getTime() >= POLL_INTERVAL_MS * 3),
+  );
+  const status = paused
+    ? "Updates paused"
+    : delayed
+      ? "Updates delayed"
+      : feeds.some(({ loading }) => loading)
+        ? "Connecting…"
+        : "Live";
+  const lastCoverageRefresh = shifts.updatedAt?.toISOString();
 
   async function reset() {
     if (pending) return;
@@ -358,29 +435,26 @@ export function AdminView() {
   const shownMessages = allMessages
     ? messages
     : messages.slice(0, RECENT_MESSAGES);
-  const seconds = POLL_INTERVAL_MS / 1000;
 
   return (
     <PageStack>
       <PageHeader
         title="Shift coverage"
-        meta={
-          <span className={styles.live}>
-            <span
-              className={styles.liveDot}
-              data-paused={paused || undefined}
-              aria-hidden="true"
-            />
-            {paused
-              ? "Live updates paused while this tab is hidden"
-              : `Live, refreshes every ${seconds} s`}
-            {shifts.updatedAt ? (
-              <span>
-                · updated{" "}
-                <RelativeTime dateTime={shifts.updatedAt.toISOString()} />
-              </span>
-            ) : null}
+        titleStatus={
+          <span className={styles.live} role="status" data-state={status}>
+            <span className={styles.liveDot} aria-hidden="true" />
+            {status}
           </span>
+        }
+        meta={
+          status === "Updates delayed" && lastCoverageRefresh ? (
+            <span>
+              Coverage last updated{" "}
+              <time dateTime={lastCoverageRefresh}>
+                {formatDateTime(lastCoverageRefresh)}
+              </time>
+            </span>
+          ) : undefined
         }
         actions={
           <>
@@ -417,7 +491,7 @@ export function AdminView() {
         <div className={styles.coverage}>
           {shifts.loading ? (
             <KpiSkeleton count={5} />
-          ) : (
+          ) : shifts.data ? (
             <KpiGrid label="Coverage summary">
               <Kpi
                 label="Needs coverage"
@@ -427,23 +501,30 @@ export function AdminView() {
               <Kpi label="Filled" value={filledShifts.length} tone="success" />
               <Kpi
                 label="Coverage rate"
-                value={coverage === null ? "—" : `${coverage}%`}
-                detail={`${filledShifts.length} of ${covered} shifts filled`}
+                value={coverage === null ? "N/A" : `${coverage}%`}
+                detail={
+                  covered > 0
+                    ? `${filledShifts.length} of ${covered} shifts filled`
+                    : undefined
+                }
               />
               <Kpi
                 label="Cancellations"
                 value={cancellations.length}
                 tone="danger"
-                detail={`${noShows} ${noShows === 1 ? "was a no-show" : "were no-shows"}`}
+                detail={
+                  noShows > 0
+                    ? `${noShows} ${noShows === 1 ? "no-show" : "no-shows"}`
+                    : undefined
+                }
               />
               <Kpi
                 label="Timesheets pending"
-                value={pendingTimesheets}
-                tone="warning"
-                detail="Awaiting approval"
+                value={timesheets.data ? pendingTimesheets : "N/A"}
+                tone={pendingTimesheets > 0 ? "warning" : "neutral"}
               />
             </KpiGrid>
-          )}
+          ) : null}
 
           <section
             id="coverage"
@@ -460,10 +541,18 @@ export function AdminView() {
                   {
                     id: "open",
                     label: "Needs coverage",
-                    count: openShifts.length,
+                    count: shifts.data ? openShifts.length : undefined,
                   },
-                  { id: "filled", label: "Filled", count: filledShifts.length },
-                  { id: "all", label: "All shifts", count: scoped.length },
+                  {
+                    id: "filled",
+                    label: "Filled",
+                    count: shifts.data ? filledShifts.length : undefined,
+                  },
+                  {
+                    id: "all",
+                    label: "All shifts",
+                    count: shifts.data ? scoped.length : undefined,
+                  },
                 ]}
               />
               <label htmlFor={agencySelectId} className="visually-hidden">
@@ -489,13 +578,13 @@ export function AdminView() {
               ) : null}
               {shifts.loading ? (
                 <TableSkeleton label="shifts" rows={3} columns={7} />
-              ) : (
+              ) : shifts.data ? (
                 <CoverageTable
                   shifts={visible}
                   lookup={lookup}
                   onCancelled={applyCancel}
                 />
-              )}
+              ) : null}
             </div>
           </section>
         </div>
@@ -523,15 +612,15 @@ export function AdminView() {
           ) : null}
           {audit.loading ? (
             <TableSkeleton label="recent activity" rows={3} columns={3} />
-          ) : (
+          ) : audit.data ? (
             <ActivityTable entries={shownEntries} lookup={lookup} />
-          )}
+          ) : null}
         </Section>
 
         <Section
           id="outbox"
-          title="Outbox"
-          count={outbox.loading ? undefined : messages.length}
+          title="Demo email outbox"
+          count={outbox.data ? messages.length : undefined}
           actions={
             messages.length > RECENT_MESSAGES ? (
               <Button
@@ -550,10 +639,10 @@ export function AdminView() {
           ) : null}
           {outbox.loading ? (
             <ListSkeleton label="notifications" rows={2} action={false} />
-          ) : messages.length === 0 ? (
+          ) : !outbox.data ? null : messages.length === 0 ? (
             <EmptyState>
-              No notifications yet. Claim and cancellation emails are held here
-              instead of being sent.
+              No demo emails yet. Claim and cancellation messages are recorded
+              here.
             </EmptyState>
           ) : (
             <OutboxList messages={shownMessages} lookup={lookup} />
@@ -565,20 +654,20 @@ export function AdminView() {
         <Section
           id="timesheets"
           title="Timesheets"
-          count={timesheets.loading ? undefined : allTimesheets.length}
+          count={timesheets.data ? allTimesheets.length : undefined}
         >
           {timesheets.error ? (
             <LoadError message={timesheets.error} onRetry={timesheets.reload} />
           ) : null}
           {timesheets.loading ? (
             <TableSkeleton label="timesheets" rows={2} columns={7} />
-          ) : (
+          ) : timesheets.data ? (
             <TimesheetTable
               timesheets={allTimesheets}
               lookup={lookup}
               showAgency
             />
-          )}
+          ) : null}
         </Section>
       </Panel>
 

@@ -3,17 +3,23 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .liveDot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  background: var(--tone-neutral-dot);
+}
+
+.live[data-state="Live"] .liveDot {
   background: var(--tone-success-dot);
 }
 
-.liveDot[data-paused] {
-  background: var(--tone-neutral-dot);
+.live[data-state="Updates delayed"] .liveDot {
+  background: var(--tone-warning-dot);
 }
 
 .coverage {
@@ -67,6 +73,22 @@
   white-space: nowrap;
 }
 
+.activitySentence,
+.message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.activitySentence {
+  margin-inline-end: auto;
+  text-align: start;
+}
+
+.activitySentence strong,
+.messageTo strong {
+  font-weight: var(--font-weight-semibold);
+}
+
 .message {
   display: grid;
   gap: var(--space-1);
@@ -88,8 +110,27 @@
 }
 
 .messageTo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
+}
+
+.messageTo strong {
+  color: var(--color-text);
+}
+
+.messageEmail,
+.messageReference {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+}
+
+.messageEmail {
+  min-width: 0;
 }
 
 .messageBody {
@@ -102,6 +143,11 @@
 }
 
 @media (max-width: 959.98px) {
+  .coverage,
+  .block {
+    gap: var(--space-3);
+  }
+
   .toolbar {
     border-bottom: 0;
   }

@@ -1,4 +1,4 @@
-/* One bordered panel per table, a pale header band as in docs/design, 1px row rules. */
+/* One bordered panel per table with quiet rules between rows. */
 .scroll {
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -21,8 +21,7 @@
 .table th {
   height: 40px;
   padding: 0 var(--space-4);
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+  color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   text-align: left;
@@ -40,9 +39,10 @@
   text-align: right;
 }
 
-.emptyRow td {
+.table .emptyRow td {
   height: auto;
   padding: var(--space-8) var(--space-5);
+  border-top: 0;
   color: var(--color-text-muted);
   text-align: center;
 }
@@ -159,17 +159,8 @@
 
   .stack .emptyRow td {
     justify-content: center;
-  }
-}
-
-/* Tablets: two cards per row, so the width isn't spent on label and value gaps. */
-@media (min-width: 640px) and (max-width: 959.98px) {
-  .stack tbody {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
-
-  .stack .emptyRow {
-    grid-column: 1 / -1;
+    margin: 0;
+    padding: var(--space-4) 0;
+    border: 0;
   }
 }

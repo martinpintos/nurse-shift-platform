@@ -1,0 +1,129 @@
+.live {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone-success-dot);
+}
+
+.liveDot[data-paused] {
+  background: var(--tone-neutral-dot);
+}
+
+.coverage {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.block {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.block > [role="tabpanel"] {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Tabs on the left, the agency filter on the right, on the tabs' rule. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.toolbar > [role="tablist"] {
+  border-bottom: 0;
+}
+
+.agency {
+  width: 240px;
+  margin-bottom: var(--space-2);
+}
+
+.status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.history {
+  color: var(--tone-danger-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.message {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+}
+
+.messageHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.messageTime {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.messageTo {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.messageBody {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 959.98px) {
+  .toolbar {
+    border-bottom: 0;
+  }
+
+  .toolbar > [role="tablist"] {
+    width: 100%;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .agency {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .message {
+    padding: var(--space-4);
+  }
+}
+
+/* Phones: the header actions keep their verb ("Export", "Reset") so both fit one row. */
+@media (max-width: 639.98px) {
+  .long {
+    display: none;
+  }
+}

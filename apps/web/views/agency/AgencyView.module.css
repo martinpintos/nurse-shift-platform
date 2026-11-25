@@ -1,0 +1,11 @@
+.block {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.block > [role="tabpanel"] {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}

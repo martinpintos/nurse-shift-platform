@@ -31,6 +31,10 @@ function renderAgency(routes: Record<string, RouteHandler> = {}) {
           agencyId: "agency-a",
           shifts: [shift1, shift2],
         },
+        "GET /api/agencies/agency-a/people": {
+          agencyId: "agency-a",
+          people: { "nurse-1": refs.people["nurse-1"]! },
+        },
         "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
         ...routes,
       },
@@ -44,7 +48,7 @@ function banner() {
 
 async function shiftTable() {
   return within(
-    await screen.findByRole("region", { name: "Your shifts table" }),
+    await screen.findByRole("region", { name: "Your shifts" }),
   ).getByRole("table");
 }
 
@@ -69,6 +73,22 @@ describe("AgencyView", () => {
     const { api } = renderAgency();
     await shiftTable();
     expect(api.callsTo("GET /api/agencies/agency-a/shifts")).toHaveLength(1);
+  });
+
+  it("names the assigned nurse, with the shift id as secondary detail", async () => {
+    renderAgency();
+    const table = await shiftTable();
+    await within(table).findByText("Maria Lopez");
+    expect(within(table).queryByText("nurse-1")).toBeNull();
+    expect(within(table).getByText("shift-2")).toBeTruthy();
+  });
+
+  it("shows skeletons, not an empty table, while loading", async () => {
+    renderAgency({
+      "GET /api/agencies/agency-a/shifts": () => new Promise(() => {}),
+    });
+    expect(await screen.findByText("Loading your shifts")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("posts a shift with valid defaults: open the form, then one click on submit", async () => {
@@ -97,20 +117,16 @@ describe("AgencyView", () => {
     expect((screen.getByLabelText("Role") as HTMLSelectElement).value).toBe(
       "RN",
     );
-    expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe(
-      tomorrow,
-    );
-    expect((screen.getByLabelText("Start") as HTMLInputElement).value).toBe(
-      "07:00",
-    );
-    expect((screen.getByLabelText("End") as HTMLInputElement).value).toBe(
+    expect(
+      (screen.getByLabelText("Shift date") as HTMLInputElement).value,
+    ).toBe(tomorrow);
+    expect(
+      (screen.getByLabelText("Start time") as HTMLInputElement).value,
+    ).toBe("07:00");
+    expect((screen.getByLabelText("End time") as HTMLInputElement).value).toBe(
       "19:00",
     );
 
-    api.set("GET /api/agencies/agency-a/shifts", {
-      agencyId: "agency-a",
-      shifts: [shift1, shift2, posted],
-    });
     fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftSubmitButton));
 
     await waitFor(() => expect(banner().textContent).toBe("Shift posted"));
@@ -121,21 +137,44 @@ describe("AgencyView", () => {
       startTime: "07:00",
       endTime: "19:00",
     });
+    // The posted shift comes from the response, without reloading the list.
     expect(await screen.findByText("shift-7")).toBeTruthy();
+    expect(api.callsTo("GET /api/agencies/agency-a/shifts")).toHaveLength(1);
   });
 
-  it("keeps the form open after posting, and the opener never closes it", async () => {
-    renderAgency({ "POST /api/shifts": () => jsonResponse(shift1, 201) });
+  it("closes the drawer after a successful post and returns focus to the opener", async () => {
+    renderAgency({
+      "POST /api/shifts": () => jsonResponse({ ...shift1, id: "shift-8" }, 201),
+    });
     await shiftTable();
+    const opener = screen.getByTestId(TEST_IDS.agencyPostShiftButton);
 
-    fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftButton));
-    fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftButton));
+    opener.focus();
+    fireEvent.click(opener);
+    // A second click on the opener keeps it open.
+    fireEvent.click(opener);
+    expect(screen.getByRole("dialog", { name: "Post shift" })).toBeTruthy();
     fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftSubmitButton));
     await waitFor(() => expect(banner().textContent).toBe("Shift posted"));
 
     expect(
-      screen.getByTestId(TEST_IDS.agencyPostShiftSubmitButton),
-    ).toBeTruthy();
+      screen.queryByTestId(TEST_IDS.agencyPostShiftSubmitButton),
+    ).toBeNull();
+    expect(opener.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it("closes the drawer with Escape or Cancel, without posting", async () => {
+    const { api } = renderAgency();
+    await shiftTable();
+    fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftButton));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Post shift" })).toBeNull();
+
+    fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftButton));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Post shift" })).toBeNull();
+    expect(api.callsTo("POST /api/shifts")).toHaveLength(0);
   });
 
   it("shows a refused post's API error verbatim", async () => {
@@ -152,6 +191,10 @@ describe("AgencyView", () => {
       ),
     );
     expect(banner().dataset.variant).toBe("error");
+    // The drawer stays open with the values, to fix and retry.
+    expect(
+      screen.getByTestId(TEST_IDS.agencyPostShiftSubmitButton),
+    ).toBeTruthy();
   });
 
   it("offers cancel only on filled shifts, defaulting to no-show, with one click", async () => {
@@ -190,6 +233,11 @@ describe("AgencyView", () => {
     });
     expect(confirm).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
+    // The reopened shift from the response replaces the row at once.
+    await waitFor(() =>
+      expect(screen.queryByTestId(TEST_IDS.shiftCancelButton)).toBeNull(),
+    );
+    expect(api.callsTo("GET /api/agencies/agency-a/shifts")).toHaveLength(1);
   });
 
   it("sends the reason picked in the select", async () => {
@@ -234,6 +282,8 @@ describe("AgencyView", () => {
       expect(banner().textContent).toBe("Timesheet approved"),
     );
     expect(api.callsTo("POST /api/timesheets/ts-1/approve")).toHaveLength(1);
-    expect(api.callsTo("GET /api/timesheets")).toHaveLength(2);
+    // The approved timesheet from the response updates the row; no reload.
+    expect(within(table).getByText("approved")).toBeTruthy();
+    expect(api.callsTo("GET /api/timesheets")).toHaveLength(1);
   });
 });

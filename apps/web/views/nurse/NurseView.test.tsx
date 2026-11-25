@@ -95,7 +95,7 @@ describe("NurseView: shifts", () => {
     expect(screen.queryByText("shift-4")).toBeNull();
   });
 
-  it("claims a shift, shows 'Shift claimed' and refreshes the list", async () => {
+  it("claims a shift and moves it to My shifts from the API's response", async () => {
     const { api } = renderNurse({
       "POST /api/shifts/shift-1/claim": {
         ...shift1,
@@ -104,23 +104,61 @@ describe("NurseView: shifts", () => {
       },
     });
     const [first] = await screen.findAllByTestId(TEST_IDS.shiftListItem);
-    api.set("GET /api/shifts", {
-      shifts: [{ ...shift1, status: "filled", claimedBy: "nurse-1" }, shift2],
-    });
 
     fireEvent.click(within(first!).getByTestId(TEST_IDS.shiftClaimButton));
 
     await expectBanner("Shift claimed", "success");
-    await waitFor(() =>
-      expect(screen.queryAllByTestId(TEST_IDS.shiftListItem)).toHaveLength(0),
-    );
-    expect(api.callsTo("GET /api/shifts")).toHaveLength(2);
+    // shift-1 left the open list at once; shift-3 is still open. No reload.
+    const items = screen.getAllByTestId(TEST_IDS.shiftListItem);
+    expect(items).toHaveLength(1);
+    expect(within(items[0]!).getByText("shift-3")).toBeTruthy();
+    expect(api.callsTo("GET /api/shifts")).toHaveLength(1);
     // A new banner message doesn't re-check the session or reload unrelated data.
     expect(api.callsTo("GET /api/auth/me")).toHaveLength(1);
     expect(api.callsTo("GET /api/credentials")).toHaveLength(1);
     expect(
       within(myShifts()).getAllByTestId(TEST_IDS.shiftCancelButton),
     ).toHaveLength(2);
+  });
+
+  it("claims and then immediately cancels the same shift", async () => {
+    const { api } = renderNurse({
+      "POST /api/shifts/shift-1/claim": {
+        ...shift1,
+        status: "filled",
+        claimedBy: "nurse-1",
+      },
+      "POST /api/shifts/shift-1/cancel": {
+        ...shift1,
+        cancellation: { reason: "advance", previousNurseId: "nurse-1" },
+      },
+    });
+    const [first] = await screen.findAllByTestId(TEST_IDS.shiftListItem);
+    fireEvent.click(within(first!).getByTestId(TEST_IDS.shiftClaimButton));
+    await expectBanner("Shift claimed", "success");
+
+    // The very next click acts on the state the claim returned.
+    fireEvent.click(
+      within(myShifts()).getByRole("button", {
+        name: /Cancel RN shift shift-1/,
+      }),
+    );
+    await expectBanner("Shift cancelled", "success");
+    expect(api.callsTo("POST /api/shifts/shift-1/cancel")[0]?.body).toEqual({
+      reason: "advance",
+    });
+    expect(screen.getAllByTestId(TEST_IDS.shiftListItem)).toHaveLength(2);
+  });
+
+  it("refreshes the open list after a refused claim (someone else may have taken it)", async () => {
+    const { api } = renderNurse({
+      "POST /api/shifts/shift-1/claim": () =>
+        errorResponse(409, ERROR_MESSAGES.shiftAlreadyFilled),
+    });
+    const [first] = await screen.findAllByTestId(TEST_IDS.shiftListItem);
+    fireEvent.click(within(first!).getByTestId(TEST_IDS.shiftClaimButton));
+    await expectBanner("Shift already filled", "error");
+    await waitFor(() => expect(api.callsTo("GET /api/shifts")).toHaveLength(2));
   });
 
   it("shows a refused claim's API error verbatim", async () => {
@@ -208,8 +246,13 @@ describe("NurseView: timesheets", () => {
       actualStart: "07:00",
       actualEnd: "19:00",
     });
-    expect(api.callsTo("GET /api/timesheets")).toHaveLength(2);
-    expect(screen.getByTestId(TEST_IDS.timesheetTable)).toBeTruthy();
+    // The submitted timesheet from the response shows at once; no reload.
+    expect(api.callsTo("GET /api/timesheets")).toHaveLength(1);
+    expect(
+      within(screen.getByTestId(TEST_IDS.timesheetTable)).getByText(
+        "submitted",
+      ),
+    ).toBeTruthy();
   });
 });
 
@@ -252,10 +295,11 @@ describe("NurseView: credentials", () => {
       "renewed-license.pdf",
     );
     expect(form.get("expiresOn")).toBe("2028-03-31");
-    // The form resets and the list reloads.
+    // The form resets and the uploaded document from the response is listed.
     await waitFor(() => expect(expiryInput().value).toBe(""));
     expect(fileInput().value).toBe("");
-    expect(api.callsTo("GET /api/credentials")).toHaveLength(2);
+    expect(api.callsTo("GET /api/credentials")).toHaveLength(1);
+    expect(screen.getByText(uploaded.fileName)).toBeTruthy();
   });
 
   it("also fires when the date comes first and the file second", async () => {

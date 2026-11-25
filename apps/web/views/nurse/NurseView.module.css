@@ -1,0 +1,154 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.filters select {
+  width: auto;
+  min-width: 168px;
+}
+
+.metaAlert {
+  color: var(--tone-danger-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Open shifts: what, when, then the action, as in docs/design. */
+.openRow {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 84px;
+  padding: var(--space-4) var(--space-5);
+}
+
+.what,
+.when,
+.myWhen {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.role {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.when strong {
+  font-size: var(--font-size-lg);
+}
+
+.claim {
+  min-width: 132px;
+}
+
+/* My shifts: the shift on one line, its actions on the next. */
+.myRow {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.myTop {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.myActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.timesheetForm,
+.timesheetDone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.formLabel {
+  margin-right: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.time {
+  width: 118px;
+}
+
+.dash {
+  color: var(--color-text-muted);
+}
+
+.total {
+  min-width: 44px;
+  margin: 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 959.98px) {
+  .openRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .openRow .what {
+    grid-column: 1;
+  }
+
+  .openRow .when {
+    grid-column: 1;
+  }
+
+  .claim {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-width: 0;
+  }
+
+  .myTop {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-4);
+  }
+
+  .myTop .what {
+    grid-column: 1;
+  }
+
+  .myActions {
+    justify-content: flex-start;
+  }
+
+  .filters {
+    width: 100%;
+  }
+
+  .filters select {
+    flex: 1;
+    min-width: 0;
+  }
+}

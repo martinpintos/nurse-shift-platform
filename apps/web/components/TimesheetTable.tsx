@@ -1,119 +1,129 @@
 "use client";
 
 import { TEST_IDS, type Timesheet } from "@repo/shared";
-import {
-  formatDateTime,
-  formatMinutes,
-  formatShiftDate,
-  formatTimeRange,
-} from "../lib/format";
-import { Badge, TableScroll, VisuallyHidden } from "./legacy-ui";
+import { formatDay, formatMinutes } from "../lib/format";
+import type { Lookup } from "../lib/lookup";
+import { StatusBadge } from "./ui/Badge";
+import { Button } from "./ui/Button";
+import { RelativeTime } from "./ui/RelativeTime";
+import { CellStack, EmptyRow, Table, Td, Th } from "./ui/Table";
+import { ShiftHours } from "./ShiftSummary";
 
 /**
- * The timesheets view, shared by every role. Nurses see their own (no nurse column),
- * agencies get an Approve button on submitted rows, admins see everything.
+ * The timesheets table, shared by every role. Nurses see their own (no nurse column),
+ * agencies get an Approve button on submitted rows, the admin sees every agency.
  */
 export function TimesheetTable({
   timesheets,
+  lookup,
   showNurse = true,
   showAgency = false,
   onApprove,
   approvingId,
 }: {
   timesheets: Timesheet[];
+  lookup: Lookup;
   showNurse?: boolean;
   showAgency?: boolean;
   onApprove?: (timesheet: Timesheet) => void;
   approvingId?: string | null;
 }) {
+  const columns =
+    5 + (showNurse ? 1 : 0) + (showAgency ? 1 : 0) + (onApprove ? 1 : 0);
   return (
-    <TableScroll label="Timesheets table">
-      <table className="data-table" data-testid={TEST_IDS.timesheetTable}>
-        <thead>
-          <tr>
-            <th scope="col">Shift</th>
-            <th scope="col">Date</th>
-            {showNurse ? <th scope="col">Nurse</th> : null}
-            {showAgency ? <th scope="col">Agency</th> : null}
-            <th scope="col">Actual hours</th>
-            <th scope="col">Worked</th>
-            <th scope="col">Status</th>
-            <th scope="col">Submitted</th>
-            {onApprove ? (
-              <th scope="col">
-                <VisuallyHidden>Actions</VisuallyHidden>
-              </th>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {timesheets.length === 0 ? (
-            <tr>
-              <td className="empty-row" colSpan={9}>
-                No timesheets yet.
-              </td>
-            </tr>
-          ) : (
-            timesheets.map((timesheet) => (
+    <Table label="Timesheets" testId={TEST_IDS.timesheetTable}>
+      <thead>
+        <tr>
+          <Th>Date</Th>
+          {showNurse ? <Th>Nurse</Th> : null}
+          <Th>Shift</Th>
+          {showAgency ? <Th>Agency</Th> : null}
+          <Th>Hours</Th>
+          <Th end>Worked</Th>
+          <Th>Status</Th>
+          {onApprove ? (
+            <Th>
+              <span className="visually-hidden">Actions</span>
+            </Th>
+          ) : null}
+        </tr>
+      </thead>
+      <tbody>
+        {timesheets.length === 0 ? (
+          <EmptyRow colSpan={columns}>No timesheets yet.</EmptyRow>
+        ) : (
+          timesheets.map((timesheet) => {
+            const shift = lookup.shift(timesheet.shiftId);
+            return (
               <tr key={timesheet.id}>
-                <td className="mono">{timesheet.shiftId}</td>
-                <td className="nowrap">{formatShiftDate(timesheet.date)}</td>
-                {showNurse ? (
-                  <td className="mono">{timesheet.nurseId}</td>
-                ) : null}
-                {showAgency ? (
-                  <td className="mono">{timesheet.agencyId}</td>
-                ) : null}
-                <td className="nums">
-                  {formatTimeRange(timesheet.actualStart, timesheet.actualEnd)}
-                </td>
-                <td className="nums">
-                  {formatMinutes(timesheet.minutesWorked)}
-                </td>
-                <td>
-                  <Badge
-                    tone={
-                      timesheet.status === "approved" ? "success" : "warning"
+                <Td label="Date">
+                  <CellStack
+                    primary={
+                      <span className="nowrap">
+                        {formatDay(timesheet.date)}
+                      </span>
                     }
-                  >
-                    {timesheet.status}
-                  </Badge>
-                </td>
-                <td className="nums">
-                  {formatDateTime(timesheet.submittedAt)}
-                  {timesheet.approvedAt ? (
-                    <span className="cell-note">
-                      Approved {formatDateTime(timesheet.approvedAt)}
-                      {timesheet.approvedBy
-                        ? ` by ${timesheet.approvedBy}`
-                        : ""}
+                    secondary={timesheet.shiftId}
+                  />
+                </Td>
+                {showNurse ? (
+                  <Td label="Nurse">{lookup.name(timesheet.nurseId)}</Td>
+                ) : null}
+                <Td label="Shift">
+                  {shift
+                    ? showAgency
+                      ? shift.role
+                      : `${shift.role} · ${shift.agencyName}`
+                    : timesheet.shiftId}
+                </Td>
+                {showAgency ? (
+                  <Td label="Agency">
+                    {shift?.agencyName ?? timesheet.agencyId}
+                  </Td>
+                ) : null}
+                <Td label="Hours">
+                  <ShiftHours
+                    shift={{
+                      startTime: timesheet.actualStart,
+                      endTime: timesheet.actualEnd,
+                    }}
+                  />
+                </Td>
+                <Td label="Worked" end className="nums nowrap">
+                  {formatMinutes(timesheet.minutesWorked)}
+                </Td>
+                <Td label="Status">
+                  <span className="nowrap">
+                    <StatusBadge kind="timesheet" status={timesheet.status} />{" "}
+                    <span className="muted small">
+                      <RelativeTime
+                        dateTime={timesheet.approvedAt ?? timesheet.submittedAt}
+                      />
                     </span>
-                  ) : null}
-                </td>
+                  </span>
+                </Td>
                 {onApprove ? (
-                  <td className="cell-actions">
+                  <Td>
                     {timesheet.status === "submitted" ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-small"
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        busy={approvingId === timesheet.id}
                         aria-label={`Approve timesheet for ${timesheet.shiftId}`}
-                        aria-disabled={
-                          approvingId === timesheet.id || undefined
-                        }
                         onClick={() => onApprove(timesheet)}
                       >
                         {approvingId === timesheet.id
                           ? "Approving…"
                           : "Approve"}
-                      </button>
+                      </Button>
                     ) : null}
-                  </td>
+                  </Td>
                 ) : null}
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </TableScroll>
+            );
+          })
+        )}
+      </tbody>
+    </Table>
   );
 }

@@ -1,5 +1,6 @@
 import {
   AdminShiftListResponseSchema,
+  AgencyPeopleResponseSchema,
   AgencyShiftListResponseSchema,
   AuditLogResponseSchema,
   CREDENTIAL_FILE_FIELD,
@@ -187,6 +188,12 @@ export function createApiClient(options: ApiClientOptions) {
       get(
         routePath("/api/agencies/:agencyId/shifts", { agencyId }),
         AgencyShiftListResponseSchema,
+      ),
+    /** Names of the nurses on the agency's shifts (the spec route carries ids only). */
+    agencyPeople: (agencyId: string) =>
+      get(
+        routePath("/api/agencies/:agencyId/people", { agencyId }),
+        AgencyPeopleResponseSchema,
       ),
 
     listCredentials: () =>

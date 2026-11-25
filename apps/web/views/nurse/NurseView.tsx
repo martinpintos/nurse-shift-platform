@@ -18,7 +18,12 @@ import {
   shiftLabel,
 } from "../../components/ShiftSummary";
 import { TimesheetTable } from "../../components/TimesheetTable";
-import { Badge, PageHeader, Section, SectionState } from "../../components/ui";
+import {
+  Badge,
+  PageHeader,
+  Section,
+  SectionState,
+} from "../../components/legacy-ui";
 import { formatMinutes, formatTimeRange } from "../../lib/format";
 import { useNotifications } from "../../lib/notifications";
 import { useApi, useCurrentUser } from "../../lib/session";

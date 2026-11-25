@@ -26,7 +26,7 @@ import {
   SectionState,
   TableScroll,
   VisuallyHidden,
-} from "../../components/ui";
+} from "../../components/legacy-ui";
 import {
   AUDIT_ACTION_LABEL,
   CANCEL_REASON_LABEL,

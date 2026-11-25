@@ -16,7 +16,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { Badge } from "../../components/ui";
+import { Badge } from "../../components/legacy-ui";
 import { errorMessage } from "../../lib/api";
 import { saveBlob } from "../../lib/download";
 import { formatBytes, formatDateTime, formatPlainDate } from "../../lib/format";

@@ -7,7 +7,7 @@ import {
   formatShiftDate,
   formatTimeRange,
 } from "../lib/format";
-import { Badge, TableScroll, VisuallyHidden } from "./ui";
+import { Badge, TableScroll, VisuallyHidden } from "./legacy-ui";
 
 /**
  * The timesheets view, shared by every role. Nurses see their own (no nurse column),

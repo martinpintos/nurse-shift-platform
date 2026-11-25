@@ -25,7 +25,7 @@ import {
   SectionState,
   TableScroll,
   VisuallyHidden,
-} from "../../components/ui";
+} from "../../components/legacy-ui";
 import { ApiError } from "../../lib/api";
 import { useApi, useCurrentUser } from "../../lib/session";
 import { useAction } from "../../lib/use-action";

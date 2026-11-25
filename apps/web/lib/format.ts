@@ -33,6 +33,26 @@ const dateTimeFormat = new Intl.DateTimeFormat(LOCALE, {
   hourCycle: "h23",
 });
 
+// "Wed, Nov 25, 2026, 13:58": the full date behind every relative time, on hover.
+const fullDateTimeFormat = new Intl.DateTimeFormat(LOCALE, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+const dayFormat = new Intl.DateTimeFormat(LOCALE, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+const relativeFormat = new Intl.RelativeTimeFormat(LOCALE, { numeric: "auto" });
+
 const timeFormat = new Intl.DateTimeFormat(LOCALE, {
   hour: "2-digit",
   minute: "2-digit",
@@ -63,6 +83,42 @@ export function formatDateTime(isoDateTime: string): string {
   return dateTimeFormat.format(new Date(isoDateTime));
 }
 
+/** The full local date and time, for a relative time's tooltip. */
+export function formatFullDateTime(isoDateTime: string): string {
+  return fullDateTimeFormat.format(new Date(isoDateTime));
+}
+
+/** `2026-10-02` → `Fri, Oct 2` (no year), for date headers and table cells. */
+export function formatDay(isoDate: string): string {
+  return dayFormat.format(utcDate(isoDate));
+}
+
+const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["second", 60],
+  ["minute", 60],
+  ["hour", 24],
+  ["day", 7],
+  ["week", 4.35],
+  ["month", 12],
+  ["year", Number.POSITIVE_INFINITY],
+];
+
+/**
+ * `just now`, `5 minutes ago`, `yesterday`, `3 weeks ago`. Under 45 seconds is "just now",
+ * so a list doesn't tick through seconds.
+ */
+export function formatRelative(isoDateTime: string, now: Date): string {
+  let value = (new Date(isoDateTime).getTime() - now.getTime()) / 1000;
+  if (Math.abs(value) < 45) return "just now";
+  for (const [unit, size] of RELATIVE_STEPS) {
+    if (Math.abs(value) < size) {
+      return relativeFormat.format(Math.round(value), unit);
+    }
+    value /= size;
+  }
+  return relativeFormat.format(Math.round(value), "year");
+}
+
 export function formatClockTime(date: Date): string {
   return timeFormat.format(date);
 }
@@ -75,6 +131,24 @@ export function isOvernight(startTime: string, endTime: string): boolean {
 /** `19:00`, `07:00` → `19:00–07:00`. Times are 24-hour, facility-local. */
 export function formatTimeRange(startTime: string, endTime: string): string {
   return `${startTime}–${endTime}`;
+}
+
+/** The calendar date a shift ends on: the next day for an overnight shift. */
+export function shiftEndDate(
+  date: string,
+  startTime: string,
+  endTime: string,
+): string {
+  if (!isOvernight(startTime, endTime)) return date;
+  const next = utcDate(date);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
+/** `19:00–07:00 +1` for an overnight shift, `07:00–19:00` otherwise. */
+export function formatHours(startTime: string, endTime: string): string {
+  const range = formatTimeRange(startTime, endTime);
+  return isOvernight(startTime, endTime) ? `${range} +1` : range;
 }
 
 /** 720 → `12 h`, 690 → `11 h 30 min`. */

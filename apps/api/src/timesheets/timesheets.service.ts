@@ -7,7 +7,6 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
-  EMPTY_REFS,
   ERROR_MESSAGES,
   timesheetMinutes,
   type SubmitTimesheetRequest,
@@ -22,6 +21,7 @@ import {
   type Timesheet as TimesheetRow,
 } from "../generated/prisma/client.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { resolveRefs } from "../refs/refs.js";
 import { agencyOf } from "../shifts/shifts.service.js";
 import { formatDbDate } from "../shifts/shift.mapper.js";
 
@@ -69,8 +69,13 @@ export class TimesheetsService {
       include: withShift,
       orderBy: [{ submittedAt: "desc" }, { id: "asc" }],
     });
-    // Placeholder until names are resolved (redesign step 2).
-    return { timesheets: rows.map(toTimesheetDto), refs: EMPTY_REFS };
+    const timesheets = rows.map(toTimesheetDto);
+    // The rows are already scoped to the caller, so the names are too.
+    const refs = await resolveRefs(this.prisma, {
+      userIds: timesheets.flatMap((ts) => [ts.nurseId, ts.approvedBy]),
+      shiftIds: timesheets.map((ts) => ts.shiftId),
+    });
+    return { timesheets, refs };
   }
 
   /** A nurse submits actual hours for a shift she holds the claim on, once. */

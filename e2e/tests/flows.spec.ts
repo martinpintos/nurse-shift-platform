@@ -197,6 +197,16 @@ test("the nurse can read and use shift and license controls on a narrow screen",
     .getByRole("list", { name: "Your claimed shifts" })
     .getByRole("listitem");
   await expect(card.getByLabel("Actual end")).toBeVisible();
+
+  await page.setViewportSize({ width: 384, height: 760 });
+  const [start, end] = await Promise.all([
+    card.getByLabel("Actual start").boundingBox(),
+    card.getByLabel("Actual end").boundingBox(),
+  ]);
+  expect(start).not.toBeNull();
+  expect(end?.y).toBeGreaterThanOrEqual(start!.y + start!.height + 16);
+
+  await page.setViewportSize({ width: 320, height: 760 });
   const clipped = await card.evaluate((row) => {
     const { left, right } = row.getBoundingClientRect();
     return [...row.querySelectorAll("input, button")].some((control) => {

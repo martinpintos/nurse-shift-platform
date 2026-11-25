@@ -62,6 +62,18 @@ The six routes in [`docs/spec.md`](docs/spec.md) are unchanged. Every route, spe
 | `GET /api/admin/outbox`            | admin                                         | the claim and cancellation notifications that would have been emailed     |
 | `POST /api/admin/reset`            | admin                                         | restores the spec's sample data                                           |
 
+## End-to-end tests
+
+Playwright tests in [`e2e/`](e2e) drive the app only through the 15 required test IDs and the spec's sample logins. Each test resets the demo data through `POST /api/admin/reset`, so tests run one at a time.
+
+```bash
+pnpm --filter e2e exec playwright install chromium   # once
+pnpm e2e                                              # builds, starts the API and web app, runs the suite
+E2E_BASE_URL=https://shiftpatch-demo.vercel.app pnpm e2e   # against a deployment
+```
+
+A run against a deployment resets its data before each test and once more at the end, so it finishes in the spec's seed state. CI runs the suite on every pull request against a fresh Postgres.
+
 ## Production
 
 | What          | URL                                                                                                        |
@@ -156,3 +168,5 @@ Product and engineering decisions, recorded as they are made.
 - **The nurse's Open shifts list (`shift-list-item`) shows open shifts only.** Her claims are under My shifts, with cancel and timesheet entry.
 - **The admin dashboard polls shifts, audit log, outbox and timesheets every 5 s**, pauses while the tab is hidden, and refreshes when it becomes visible.
 - **Shift dates are formatted in UTC**, so they never move a day. Audit and upload timestamps use the viewer's time zone.
+- **End-to-end tests use only the 15 test IDs**, like the automated checks. That covers sign-in, claim and refusal, cancel, post, the live admin badge, history, audit, outbox, timesheets and credential upload. The four automated-check rules each have their own test: auto-upload, valid post defaults, one-click cancel with each role's default reason (no dialog), and buttons only in the right state. A ~1.9 MB upload and a fake PDF also go through the Vercel proxy.
+- **The e2e suite can run against production** (`E2E_BASE_URL`). It resets the demo data per test and once at the end, leaving the spec's seed state.

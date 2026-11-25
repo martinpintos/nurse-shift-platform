@@ -8,7 +8,8 @@
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "verify": "bash scripts/verify.sh"
+    "verify": "bash scripts/verify.sh",
+    "e2e": "turbo run build --filter=api --filter=web --output-logs=errors-only && pnpm --filter e2e e2e"
   },
   "devDependencies": {
     "prettier": "3.9.6",

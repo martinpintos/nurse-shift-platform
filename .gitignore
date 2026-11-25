@@ -45,3 +45,8 @@ apps/api/src/generated/
 
 # Claude Code: commit shared commands, keep personal settings local
 .claude/settings.local.json
+
+# Playwright
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/

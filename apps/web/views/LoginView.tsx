@@ -4,11 +4,13 @@ import { TEST_IDS } from "@repo/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Brand } from "../components/BrandMark";
-import { NotificationBanner } from "../components/NotificationBanner";
+import { Button } from "../components/ui/Button";
+import { Field, Input } from "../components/ui/Field";
 import { errorMessage } from "../lib/api";
 import { useNotifications } from "../lib/notifications";
 import { ROLE_HOME } from "../lib/roles";
 import { useSession } from "../lib/session";
+import styles from "./LoginView.module.css";
 
 export function LoginView() {
   const { state, login } = useSession();
@@ -31,7 +33,7 @@ export function LoginView() {
     setSubmitting(true);
     try {
       await login(email.trim(), password);
-      // The sign-in replaces any earlier banner (a failed attempt, an expired session).
+      // The sign-in replaces any earlier toast (a failed attempt, an expired session).
       clear();
     } catch (error) {
       notifyError(errorMessage(error));
@@ -40,59 +42,54 @@ export function LoginView() {
   }
 
   return (
-    <main className="login-page">
-      <div className="login-card card">
+    <main className={styles.page}>
+      <div className={styles.card}>
         <Brand />
-        <div className="login-intro">
-          <h1>Sign in</h1>
-          <p className="muted">
-            Post, claim and track nursing shifts across your agencies.
-          </p>
-        </div>
-        <NotificationBanner />
-        <form className="form-stack" onSubmit={onSubmit}>
-          <div className="field">
-            <label htmlFor="login-email">Email</label>
-            <input
-              id="login-email"
-              className="input"
-              type="email"
-              name="email"
-              autoComplete="username"
-              inputMode="email"
-              autoCapitalize="none"
-              spellCheck={false}
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              data-testid={TEST_IDS.loginEmailInput}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              className="input"
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              data-testid={TEST_IDS.loginPasswordInput}
-            />
-          </div>
-          <button
+        <h1 className={styles.title}>Sign in</h1>
+        <form className={styles.form} onSubmit={onSubmit}>
+          <Field label="Email">
+            {({ id }) => (
+              <Input
+                id={id}
+                type="email"
+                name="email"
+                autoComplete="username"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                data-testid={TEST_IDS.loginEmailInput}
+              />
+            )}
+          </Field>
+          <Field label="Password">
+            {({ id }) => (
+              <Input
+                id={id}
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                data-testid={TEST_IDS.loginPasswordInput}
+              />
+            )}
+          </Field>
+          <Button
             type="submit"
-            className="btn btn-primary btn-block"
-            aria-disabled={submitting || undefined}
+            variant="primary"
+            block
+            busy={submitting}
             data-testid={TEST_IDS.loginSubmitButton}
           >
             {submitting ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
         </form>
       </div>
-      <p className="login-footnote muted">
+      <p className={styles.footnote}>
         ShiftPatch is a demo. All agencies, nurses and shifts are fictional.
       </p>
     </main>

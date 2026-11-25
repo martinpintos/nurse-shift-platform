@@ -234,6 +234,6 @@ describe("AdminView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset demo data" }));
 
     expect(api.callsTo("POST /api/admin/reset")).toHaveLength(0);
-    expect(banner().textContent).toBe("");
+    expect(screen.queryByTestId(TEST_IDS.notificationBanner)).toBeNull();
   });
 });

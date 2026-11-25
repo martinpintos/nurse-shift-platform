@@ -2,7 +2,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { TEST_IDS, type TestId } from "@repo/shared";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { useEffect, type ReactElement } from "react";
+import { useNotifications } from "../lib/notifications";
 import { describe, expect, it } from "vitest";
 import { RequireRole } from "../components/RoleRouting";
 import type { RouteHandler } from "../test/fetch-mock";
@@ -42,7 +43,7 @@ const EXPECTED_ELEMENT: Record<TestId, string> = {
   "admin-shift-status-badge": "span",
   "audit-log-table": "table",
   "timesheet-table": "table",
-  "notification-banner": "div[role=status][aria-live=polite]",
+  "notification-banner": "div[role=status][data-variant]",
 };
 
 const views: {
@@ -112,6 +113,12 @@ const views: {
   },
 ];
 
+function NotifyOnMount() {
+  const { notifySuccess } = useNotifications();
+  useEffect(() => notifySuccess("Shift claimed"), [notifySuccess]);
+  return null;
+}
+
 describe("required test IDs", () => {
   it("renders every one of the 15 TEST_IDS somewhere in the app, on the acting element", async () => {
     const seen = new Map<string, Set<string>>();
@@ -137,13 +144,18 @@ describe("required test IDs", () => {
       cleanup();
     }
 
+    // The toast exists only while it reports an action; check it on its own.
+    renderApp(<NotifyOnMount />);
+    const toast = await screen.findByTestId(TEST_IDS.notificationBanner);
+    expect(toast.matches(EXPECTED_ELEMENT[TEST_IDS.notificationBanner])).toBe(
+      true,
+    );
+    seen.set(TEST_IDS.notificationBanner, new Set(["toast"]));
+    cleanup();
+
     const required = Object.values(TEST_IDS);
     expect(required).toHaveLength(15);
     expect([...seen.keys()].sort()).toEqual([...required].sort());
-    // The one banner is on every screen.
-    expect([...(seen.get(TEST_IDS.notificationBanner) ?? [])].sort()).toEqual(
-      views.map((view) => view.name).sort(),
-    );
   });
 
   it("uses test IDs only through TEST_IDS, never as string literals", () => {

@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
 import { Brand } from "./BrandMark";
+import { Button } from "./ui/Button";
+import { Skeleton, SkeletonGroup } from "./ui/Skeleton";
+import styles from "./FullPageMessage.module.css";
 
 /** Centered placeholder while the session resolves, or when it can't. */
 export function FullPageMessage({ children }: { children: ReactNode }) {
   return (
-    <main className="full-page">
+    <main className={styles.page}>
       <Brand />
-      <div className="full-page-body">{children}</div>
+      <div className={styles.body}>{children}</div>
     </main>
   );
 }
@@ -14,9 +17,11 @@ export function FullPageMessage({ children }: { children: ReactNode }) {
 export function SessionLoading() {
   return (
     <FullPageMessage>
-      <p className="muted" role="status">
-        Loading…
-      </p>
+      <SkeletonGroup label="your workspace" className={styles.skeleton}>
+        <Skeleton width="70%" height={18} />
+        <Skeleton width="90%" height={12} />
+        <Skeleton width="50%" height={12} />
+      </SkeletonGroup>
     </FullPageMessage>
   );
 }
@@ -31,9 +36,9 @@ export function SessionError({
   return (
     <FullPageMessage>
       <p role="alert">{message}</p>
-      <button type="button" className="btn btn-primary" onClick={onRetry}>
+      <Button variant="primary" onClick={onRetry}>
         Try again
-      </button>
+      </Button>
     </FullPageMessage>
   );
 }

@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import { errorResponse, jsonResponse } from "../test/fetch-mock";
 import { admin, agency, nurse } from "../test/fixtures";
 import { TEST_TOKEN, renderApp } from "../test/render";
-import { router } from "../test/router";
+import { router, setPathname } from "../test/router";
+import { useNotifications } from "../lib/notifications";
 import { TOKEN_STORAGE_KEY, useApi } from "../lib/session";
 import { LoginView } from "../views/LoginView";
-import { NotificationBanner } from "./NotificationBanner";
 import { RequireRole, RoleRedirect } from "./RoleRouting";
 
 const homes: [MeResponse, string][] = [
@@ -72,8 +72,12 @@ describe("role routing", () => {
       { user: agency },
     );
     expect(await screen.findByText("Agency page")).toBeTruthy();
-    expect(screen.getByText("Sunrise Health Staffing")).toBeTruthy();
-    expect(screen.getByTestId(TEST_IDS.notificationBanner)).toBeTruthy();
+    // The user card (sidebar) and the account menu (top bar) both name the user.
+    expect(
+      screen.getAllByText("Sunrise Health Staffing").length,
+    ).toBeGreaterThan(0);
+    // No toast until an action reports something.
+    expect(screen.queryByTestId(TEST_IDS.notificationBanner)).toBeNull();
     expect(router.replace).not.toHaveBeenCalled();
   });
 });
@@ -111,7 +115,7 @@ describe("session", () => {
     expect(document.cookie).toBe("");
   });
 
-  it("shows a failed login's API error in the banner and stays on /login", async () => {
+  it("shows a failed login's API error in the toast and stays on /login", async () => {
     renderApp(<LoginView />, {
       routes: {
         "POST /api/auth/login": () =>
@@ -127,10 +131,8 @@ describe("session", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    const banner = screen.getByTestId(TEST_IDS.notificationBanner);
-    await waitFor(() =>
-      expect(banner.textContent).toBe("Invalid email or password"),
-    );
+    const banner = await screen.findByTestId(TEST_IDS.notificationBanner);
+    expect(banner.textContent).toBe("Invalid email or password");
     expect(banner.dataset.variant).toBe("error");
     expect(router.replace).not.toHaveBeenCalled();
     expect(storedToken()).toBeNull();
@@ -161,14 +163,13 @@ describe("session", () => {
         </button>
       );
     }
+    // The mocked router never navigates; stand in for having landed on /login, where the
+    // toast is scoped.
+    setPathname("/login");
     renderApp(
-      <>
-        {/* Stands in for the login page's banner, which the mocked router never shows. */}
-        <NotificationBanner />
-        <RequireRole role="nurse">
-          <Probe />
-        </RequireRole>
-      </>,
+      <RequireRole role="nurse">
+        <Probe />
+      </RequireRole>,
       {
         user: nurse,
         routes: {
@@ -182,9 +183,9 @@ describe("session", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"));
     expect(storedToken()).toBeNull();
     expect(screen.queryByRole("button", { name: "Load shifts" })).toBeNull();
-    // The banner says why the user is back at sign-in.
-    const [banner] = screen.getAllByTestId(TEST_IDS.notificationBanner);
-    expect(banner?.textContent).toBe("Invalid or expired token");
+    // The toast says why the user is back at sign-in.
+    const toast = await screen.findByTestId(TEST_IDS.notificationBanner);
+    expect(toast.textContent).toBe("Invalid or expired token");
   });
 
   it("signs out: clears the token and goes to /login", async () => {
@@ -200,6 +201,30 @@ describe("session", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"));
     expect(storedToken()).toBeNull();
     expect(screen.queryByText("Nurse page")).toBeNull();
+  });
+
+  it("signing out clears the toast, error or not", async () => {
+    function Fail() {
+      const { notifyError } = useNotifications();
+      return (
+        <button type="button" onClick={() => notifyError("Something failed")}>
+          Fail
+        </button>
+      );
+    }
+    renderApp(
+      <RequireRole role="nurse">
+        <Fail />
+      </RequireRole>,
+      { user: nurse },
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Fail" }));
+    expect(screen.getByTestId(TEST_IDS.notificationBanner)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId(TEST_IDS.notificationBanner)).toBeNull(),
+    );
   });
 
   it("offers a retry when the session can't be checked (API unreachable)", async () => {

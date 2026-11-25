@@ -1,4 +1,6 @@
-/** The fictional ShiftPatch mark: a rounded patch with a cross. Decorative. */
+import styles from "./BrandMark.module.css";
+
+/** The fictional ShiftPatch mark: three staggered shift bars. Decorative. */
 export function BrandMark({ size = 28 }: { size?: number }) {
   return (
     <svg
@@ -7,24 +9,21 @@ export function BrandMark({ size = 28 }: { size?: number }) {
       viewBox="0 0 32 32"
       width={size}
       height={size}
-      className="brand-mark"
+      className={styles.mark}
     >
-      <rect x="2" y="2" width="28" height="28" rx="9" fill="var(--accent)" />
-      <path
-        d="M16 9.5v13M9.5 16h13"
-        stroke="var(--accent-contrast)"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-      />
+      <rect x="3" y="7" width="26" height="4" rx="2" fill="currentColor" />
+      <rect x="9" y="14" width="20" height="4" rx="2" fill="currentColor" />
+      <rect x="3" y="21" width="16" height="4" rx="2" fill="currentColor" />
     </svg>
   );
 }
 
-export function Brand() {
+/** The mark and the name. `onDark` for the navy shell, otherwise navy on light. */
+export function Brand({ onDark = false }: { onDark?: boolean }) {
   return (
-    <span className="brand">
+    <span className={styles.brand} data-on-dark={onDark || undefined}>
       <BrandMark />
-      <span className="brand-name">ShiftPatch</span>
+      <span className={styles.name}>ShiftPatch</span>
     </span>
   );
 }

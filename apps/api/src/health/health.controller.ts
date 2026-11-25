@@ -4,6 +4,7 @@ import {
   Inject,
   ServiceUnavailableException,
 } from "@nestjs/common";
+import { Access } from "../auth/access.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
 /**
@@ -15,6 +16,7 @@ export class HealthController {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   @Get()
+  @Access("GET /api/health")
   async check(): Promise<{ status: "ok" }> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;

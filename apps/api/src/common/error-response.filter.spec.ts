@@ -6,8 +6,11 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from "@nestjs/common";
-import { ErrorResponseSchema } from "@repo/shared";
+import { AuthenticationError, JwtError } from "@nestjs/authentication";
+import { AuthorizationError } from "@nestjs/authorization";
+import { ERROR_MESSAGES, ErrorResponseSchema } from "@repo/shared";
 import {
   ErrorResponseFilter,
   toErrorResponse,
@@ -55,6 +58,55 @@ describe("toErrorResponse", () => {
     );
     expect(status).toBe(500);
     expect(body).toEqual({ error: "Internal server error" });
+  });
+
+  it("maps the authentication guard's missing-credentials 401", () => {
+    const exception = new UnauthorizedException(undefined, {
+      errorCode: "missing_credentials",
+    });
+    expect(toErrorResponse(exception)).toEqual({
+      status: 401,
+      body: { error: ERROR_MESSAGES.authRequired },
+    });
+  });
+
+  it("maps a token that failed verification to Invalid or expired token", () => {
+    const exception = new UnauthorizedException("token expired", {
+      cause: new JwtError("token expired"),
+    });
+    expect(toErrorResponse(exception)).toEqual({
+      status: 401,
+      body: { error: ERROR_MESSAGES.invalidToken },
+    });
+    expect(
+      toErrorResponse(new AuthenticationError("unknown subject")).body,
+    ).toEqual({
+      error: ERROR_MESSAGES.invalidToken,
+    });
+  });
+
+  it("maps an authorization denial to the forbidden message", () => {
+    const exception = new ForbiddenException(undefined, {
+      cause: new AuthorizationError("forbidden", "RolePolicy", "hasRole"),
+    });
+    expect(toErrorResponse(exception)).toEqual({
+      status: 403,
+      body: { error: ERROR_MESSAGES.forbidden },
+    });
+  });
+
+  it("keeps the app's own 401 and 403 messages", () => {
+    expect(
+      toErrorResponse(
+        new UnauthorizedException(ERROR_MESSAGES.invalidCredentials),
+      ).body,
+    ).toEqual({ error: ERROR_MESSAGES.invalidCredentials });
+    expect(
+      toErrorResponse(new ForbiddenException(ERROR_MESSAGES.notYourAgency))
+        .body,
+    ).toEqual({
+      error: ERROR_MESSAGES.notYourAgency,
+    });
   });
 
   it("always produces a body that matches the contract", () => {

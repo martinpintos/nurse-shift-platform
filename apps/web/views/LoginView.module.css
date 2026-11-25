@@ -10,9 +10,9 @@
 
 .card {
   display: grid;
-  gap: var(--space-6);
-  width: min(400px, 100%);
-  padding: var(--space-8);
+  gap: var(--space-5);
+  width: min(380px, 100%);
+  padding: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);

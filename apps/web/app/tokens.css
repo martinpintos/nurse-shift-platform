@@ -82,13 +82,14 @@
   --space-12: 48px;
 
   /* Type */
+  /* App-screen scale: 12/13/14/16/18/24, as in real tools, not the mockups' poster scale. */
   --font-size-xs: 0.75rem; /* 12 */
   --font-size-sm: 0.8125rem; /* 13 */
-  --font-size-md: 0.9375rem; /* 15, body */
-  --font-size-lg: 1.0625rem; /* 17, section titles */
-  --font-size-xl: 1.375rem; /* 22 */
-  --font-size-2xl: 1.75rem; /* 28, page titles */
-  --font-size-kpi: 1.875rem; /* 30 */
+  --font-size-md: 0.875rem; /* 14, body, cells, nav */
+  --font-size-lg: 1rem; /* 16, card titles, row identity */
+  --font-size-xl: 1.125rem; /* 18, section titles */
+  --font-size-2xl: 1.5rem; /* 24, page titles */
+  --font-size-kpi: 1.5rem; /* 24 */
   --font-weight-regular: 400;
   --font-weight-medium: 520;
   --font-weight-semibold: 620;
@@ -112,21 +113,21 @@
   --z-toast: 60;
 
   /* Layout */
-  --sidebar-width: 220px;
-  --sidebar-rail-width: 68px;
+  --sidebar-width: 212px;
+  --sidebar-rail-width: 60px;
   /* Brand plus up to five nav items: the toast never rises into this band. */
-  --sidebar-nav-reserve: 320px;
-  --sidebar-user-card-height: 72px;
-  --topbar-height: 56px;
-  --bottom-tabs-height: 64px;
-  --drawer-width: 400px;
+  --sidebar-nav-reserve: 280px;
+  --sidebar-user-card-height: 64px;
+  --topbar-height: 52px;
+  --bottom-tabs-height: 60px;
+  --drawer-width: 380px;
   --content-max: 1240px;
-  --gutter: var(--space-10);
+  --gutter: var(--space-8);
   /* Between the blocks of a page, and between a block's heading and its content. */
-  --section-gap: var(--space-10);
-  --block-gap: var(--space-4);
-  --control-height: 40px;
-  --control-height-sm: 32px;
+  --section-gap: var(--space-8);
+  --block-gap: var(--space-3);
+  --control-height: 36px;
+  --control-height-sm: 30px;
 
   --motion-fast: 120ms;
   --motion-medium: 200ms;
@@ -137,6 +138,6 @@
 @media (max-width: 959.98px) {
   :root {
     --gutter: var(--space-4);
-    --section-gap: var(--space-8);
+    --section-gap: var(--space-6);
   }
 }

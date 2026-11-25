@@ -46,7 +46,7 @@
 }
 
 .card {
-  padding: var(--space-6);
+  padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
@@ -58,15 +58,15 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  min-height: 36px;
+  min-height: 30px;
 }
 
 .title {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: 1.25rem;
-  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
 }
 
 .card .title {
@@ -117,7 +117,7 @@
   }
 
   .pageHeader h1 {
-    font-size: var(--font-size-xl);
+    font-size: 1.25rem;
   }
 
   .title {

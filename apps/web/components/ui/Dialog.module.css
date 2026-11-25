@@ -1,7 +1,7 @@
 .dialog {
   width: min(440px, calc(100vw - 2 * var(--space-4)));
   margin: auto;
-  padding: var(--space-6);
+  padding: var(--space-5);
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--color-surface);

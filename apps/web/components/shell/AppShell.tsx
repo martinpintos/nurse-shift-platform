@@ -190,7 +190,7 @@ export function AppShell({
                     title={collapsed ? section.label : undefined}
                     onClick={() => setActivePanel(panelOf(section))}
                   >
-                    <Icon size={20} />
+                    <Icon size={18} />
                     <span className={styles.navLabel}>{section.label}</span>
                   </a>
                 </li>
@@ -202,7 +202,7 @@ export function AppShell({
           className={styles.userCard}
           title={collapsed ? user.name : undefined}
         >
-          <Avatar name={user.name} size={36} />
+          <Avatar name={user.name} size={32} />
           <div className={styles.userText}>
             <span className={styles.userName}>{user.name}</span>
             <span className={styles.userRole}>{ROLE_LABEL[user.role]}</span>
@@ -245,7 +245,7 @@ export function AppShell({
               aria-current={current ? "page" : undefined}
               onClick={() => showPanel(panel.id)}
             >
-              <Icon size={22} />
+              <Icon size={20} />
               <span>{panel.label}</span>
             </button>
           );

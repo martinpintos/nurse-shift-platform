@@ -17,8 +17,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  height: 72px;
-  padding: 0 var(--space-3) 0 var(--space-5);
+  height: 60px;
+  padding: 0 var(--space-2) 0 var(--space-4);
 }
 
 .brandRow :global(svg) {
@@ -50,7 +50,7 @@
 .nav {
   /* The band between the nav and the user card stays free for the toast. */
   flex: 1;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2);
 }
 
 .nav ul {
@@ -63,7 +63,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 42px;
+  min-height: 36px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
   color: var(--color-shell-muted);
@@ -104,7 +104,7 @@
   align-items: center;
   gap: var(--space-3);
   height: var(--sidebar-user-card-height);
-  margin: 0 var(--space-3);
+  margin: 0 var(--space-2);
   padding: 0 var(--space-2);
   border-top: 1px solid var(--color-shell-border);
 }
@@ -225,7 +225,7 @@
 .content {
   max-width: calc(var(--content-max) + 2 * var(--gutter));
   margin: 0 auto;
-  padding: var(--space-8) var(--gutter) var(--space-16, 64px);
+  padding: var(--space-6) var(--gutter) var(--space-12);
 }
 
 .topBar,

@@ -137,7 +137,16 @@ describe("admin (e2e)", () => {
 
     it("writes one entry per state change, with ids and enum values only", async () => {
       await demoActivity();
-      const entries = await auditLog();
+      const response = AuditLogResponseSchema.parse(
+        (
+          await t
+            .http()
+            .get("/api/admin/audit-log")
+            .set(as("admin-1"))
+            .expect(200)
+        ).body,
+      );
+      const { entries } = response;
       expect(entries.map((e) => e.action).reverse()).toEqual([
         "shift.claimed",
         "shift.cancelled",
@@ -146,6 +155,7 @@ describe("admin (e2e)", () => {
         "timesheet.submitted",
         "timesheet.approved",
       ]);
+      // The entries (details included) stay ids and enums; names live only in refs.people.
       const serialized = JSON.stringify(entries);
       for (const user of SEED_USERS) {
         expect(serialized).not.toContain(user.name);
@@ -153,6 +163,23 @@ describe("admin (e2e)", () => {
       }
       expect(serialized).not.toContain("Sunrise");
       expect(serialized).not.toContain(".png");
+      // refs carries names (and shift descriptions), never emails or file names.
+      const refs = JSON.stringify(response.refs);
+      expect(refs).not.toContain("@");
+      expect(refs).not.toContain(".png");
+      expect(response.refs.people).toEqual({
+        "agency-a": { name: "Sunrise Health Staffing", role: "agency" },
+        "nurse-1": { name: "Maria Lopez", role: "nurse" },
+        "nurse-2": { name: "James Cook", role: "nurse" },
+      });
+      // Shift refs name the agency (ShiftRef.agencyName), never a person.
+      const shiftRefs = JSON.stringify(response.refs.shifts);
+      for (const user of SEED_USERS.filter((u) => u.role !== "agency")) {
+        expect(shiftRefs).not.toContain(user.name);
+      }
+      // The stored rows are unchanged: ids and enum values only.
+      const stored = JSON.stringify(await t.prisma.auditLog.findMany());
+      for (const user of SEED_USERS) expect(stored).not.toContain(user.name);
     });
   });
 

@@ -154,9 +154,10 @@ describe("auth (e2e)", () => {
     });
   });
 
-  describe("login throttle", () => {
-    // Each test uses its own client IP (trust proxy, 1 hop), so counters don't mix.
-    function attempt(ip: string, email: string, password: string) {
+  describe("login throttle (per account)", () => {
+    // A spoofed X-Forwarded-For per attempt stands in for a client rotating IPs, or for
+    // the rotating proxy addresses the API sees behind Vercel and Railway.
+    function attempt(email: string, password: string, ip = "203.0.113.10") {
       return t
         .http()
         .post("/api/auth/login")
@@ -164,63 +165,55 @@ describe("auth (e2e)", () => {
         .send({ email, password });
     }
 
-    it("blocks the 11th failure for an IP and email, then the right password too, until the window passes", async () => {
-      const ip = "203.0.113.10";
+    it("blocks the 11th failure for an account, then the right password too, until the window passes", async () => {
       const email = emailOf("nurse-2");
       for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount; i++) {
-        const response = await attempt(ip, email, "wrong");
+        const response = await attempt(email, "wrong");
         expect(response.status, `attempt ${i + 1}`).toBe(401);
       }
-      const blocked = await attempt(ip, email, "wrong").expect(429);
+      const blocked = await attempt(email, "wrong").expect(429);
       expect(blocked.body).toEqual({
         error: ERROR_MESSAGES.tooManyLoginAttempts,
       });
       // Checked before the password: the correct one is refused within the window.
-      const correct = await attempt(ip, email, SEED_PASSWORD).expect(429);
+      const correct = await attempt(email, SEED_PASSWORD).expect(429);
       expect(errorOf(correct)).toBe(ERROR_MESSAGES.tooManyLoginAttempts);
       // Case and spaces don't make a new counter.
-      await attempt(ip, ` ${email.toUpperCase()} `, SEED_PASSWORD).expect(429);
-
-      // Other emails from the same IP, and the same email from another IP, are unaffected.
-      await attempt(ip, emailOf("admin-1"), SEED_PASSWORD).expect(200);
-      await attempt("203.0.113.11", email, SEED_PASSWORD).expect(200);
+      await attempt(` ${email.toUpperCase()} `, SEED_PASSWORD).expect(429);
+      // Other accounts are unaffected.
+      await attempt(emailOf("admin-1"), SEED_PASSWORD).expect(200);
 
       t.clock.advance(LOGIN_THROTTLE.windowMs);
-      await attempt(ip, email, SEED_PASSWORD).expect(200);
+      await attempt(email, SEED_PASSWORD).expect(200);
     });
 
-    it("never counts successful sign-ins, and a success clears the IP+email counter", async () => {
-      const ip = "203.0.113.20";
-      const email = emailOf("nurse-1");
-      for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount + 2; i++) {
-        await attempt(ip, email, SEED_PASSWORD).expect(200);
-      }
-      for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount - 1; i++) {
-        await attempt(ip, email, "wrong").expect(401);
-      }
-      await attempt(ip, email, SEED_PASSWORD).expect(200);
-      // The counter restarted: another nine failures are still answered 401.
-      for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount - 1; i++) {
-        await attempt(ip, email, "wrong").expect(401);
-      }
-      await attempt(ip, email, SEED_PASSWORD).expect(200);
-    });
-
-    it("blocks an IP after 30 failures across emails", async () => {
-      const ip = "203.0.113.30";
-      for (let i = 0; i < LOGIN_THROTTLE.maxPerIp; i++) {
-        const response = await attempt(ip, `user-${i}@example.com`, "wrong");
+    it("counts failures from every IP against the same account", async () => {
+      // An email no seeded user has, so the lock doesn't leak into other tests.
+      const email = "rotating-ips@example.com";
+      for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount; i++) {
+        const response = await attempt(email, "wrong", `198.51.100.${i + 1}`);
         expect(response.status, `attempt ${i + 1}`).toBe(401);
       }
-      const blocked = await attempt(
-        ip,
-        emailOf("admin-1"),
-        SEED_PASSWORD,
-      ).expect(429);
-      expect(errorOf(blocked)).toBe(ERROR_MESSAGES.tooManyLoginAttempts);
-      await attempt("203.0.113.31", emailOf("admin-1"), SEED_PASSWORD).expect(
-        200,
+      const blocked = await attempt(email, "wrong", "198.51.100.200").expect(
+        429,
       );
+      expect(errorOf(blocked)).toBe(ERROR_MESSAGES.tooManyLoginAttempts);
+    });
+
+    it("never counts successful sign-ins, and a success clears the account's counter", async () => {
+      const email = emailOf("nurse-1");
+      for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount + 2; i++) {
+        await attempt(email, SEED_PASSWORD).expect(200);
+      }
+      for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount - 1; i++) {
+        await attempt(email, "wrong").expect(401);
+      }
+      await attempt(email, SEED_PASSWORD).expect(200);
+      // The counter restarted: another nine failures are still answered 401.
+      for (let i = 0; i < LOGIN_THROTTLE.maxPerAccount - 1; i++) {
+        await attempt(email, "wrong").expect(401);
+      }
+      await attempt(email, SEED_PASSWORD).expect(200);
     });
   });
 

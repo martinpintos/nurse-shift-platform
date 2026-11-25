@@ -5,7 +5,6 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
-  Ip,
   Post,
 } from "@nestjs/common";
 import { CurrentUser } from "@nestjs/authentication";
@@ -23,15 +22,14 @@ import type { Principal } from "./principal.js";
 export class AuthController {
   constructor(@Inject(AuthService) private readonly auth: AuthService) {}
 
-  /** POST /api/auth/login. `ip` is Express's `req.ip`, which honours TRUST_PROXY_HOPS. */
+  /** POST /api/auth/login. Failed attempts are throttled per account (LoginThrottle). */
   @Post("login")
   @Access("POST /api/auth/login")
   @HttpCode(HttpStatus.OK)
   login(
     @Body({ schema: LoginRequestSchema }) body: LoginRequest,
-    @Ip() ip: string | undefined,
   ): Promise<LoginResponse> {
-    return this.auth.login(body, ip ?? "unknown");
+    return this.auth.login(body);
   }
 
   @Get("me")

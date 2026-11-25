@@ -1,11 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Clock } from "../common/clock.js";
 
-/** Failed sign-ins allowed within the window, per IP and email, and per IP. */
+/** Failed sign-ins allowed per account (email) within the window, from any IP. */
 export const LOGIN_THROTTLE = {
   windowMs: 15 * 60 * 1000,
   maxPerAccount: 10,
-  maxPerIp: 30,
   /** Bounds memory: past this many keys, the least recently failed are dropped. */
   maxKeys: 50_000,
 } as const;
@@ -18,10 +17,15 @@ export function normalizeEmail(email: string): string {
 }
 
 /**
- * In-memory login throttle that counts failed attempts only, in a sliding window. Once a
- * key is over its limit, every attempt for it gets 429 before the password is checked, a
- * correct one included, until old failures leave the window. A successful sign-in clears
- * its IP+email counter but not the IP's, so knowing one password doesn't reset the IP.
+ * In-memory login throttle, per account: it counts failed attempts for an email in a
+ * sliding window, whatever IP they come from. Behind Vercel and Railway the API can't
+ * see a trustworthy client IP (every request arrives from a different proxy address), so
+ * keying on the account is what actually stops password guessing.
+ *
+ * Once an email is over the limit, every attempt for it gets 429 before the password is
+ * checked, a correct one included, until old failures leave the window. The trade-off,
+ * accepted for this product: anyone can hold an account's sign-in for up to 15 minutes.
+ * A successful sign-in clears the account's counter.
  *
  * One instance per process: with several API replicas each counts on its own.
  */
@@ -31,24 +35,21 @@ export class LoginThrottle {
 
   constructor(@Inject(Clock) private readonly clock: Clock) {}
 
-  isBlocked(ip: string, email: string): boolean {
+  isBlocked(email: string): boolean {
     const now = this.clock.now().getTime();
     return (
-      this.recent(accountKey(ip, email), now).length >=
-        LOGIN_THROTTLE.maxPerAccount ||
-      this.recent(ipKey(ip), now).length >= LOGIN_THROTTLE.maxPerIp
+      this.recent(accountKey(email), now).length >= LOGIN_THROTTLE.maxPerAccount
     );
   }
 
-  recordFailure(ip: string, email: string): void {
+  recordFailure(email: string): void {
     const now = this.clock.now().getTime();
-    this.push(accountKey(ip, email), now, LOGIN_THROTTLE.maxPerAccount);
-    this.push(ipKey(ip), now, LOGIN_THROTTLE.maxPerIp);
+    this.push(accountKey(email), now, LOGIN_THROTTLE.maxPerAccount);
     this.bound();
   }
 
-  recordSuccess(ip: string, email: string): void {
-    this.failures.delete(accountKey(ip, email));
+  recordSuccess(email: string): void {
+    this.failures.delete(accountKey(email));
   }
 
   /** Number of keys held, for tests. */
@@ -92,10 +93,6 @@ export class LoginThrottle {
   }
 }
 
-function ipKey(ip: string): string {
-  return `ip\u0000${ip}`;
-}
-
-function accountKey(ip: string, email: string): string {
-  return `account\u0000${ip}\u0000${normalizeEmail(email).slice(0, MAX_EMAIL_LENGTH)}`;
+function accountKey(email: string): string {
+  return normalizeEmail(email).slice(0, MAX_EMAIL_LENGTH);
 }

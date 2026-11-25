@@ -2,12 +2,10 @@ import {
   type INestApplication,
   StandardSchemaValidationPipe,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import type { ErrorResponse } from "@repo/shared";
-import type { Application, NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import { ErrorResponseFilter } from "./common/error-response.filter.js";
-import type { Env } from "./config/env.js";
 
 const PREFIX = "api";
 
@@ -33,11 +31,6 @@ function outsidePrefixNotFound(
  * what production serves.
  */
 export function configureApp<T extends INestApplication>(app: T): T {
-  const config = app.get<ConfigService<Env, true>>(ConfigService);
-  // req.ip (the login throttle's key) is the client only behind exactly this many proxies.
-  const express = app.getHttpAdapter().getInstance() as Application;
-  express.set("trust proxy", config.get("TRUST_PROXY_HOPS", { infer: true }));
-
   app.use(helmet());
   app.use(outsidePrefixNotFound);
   app.setGlobalPrefix(PREFIX);

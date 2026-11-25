@@ -14,19 +14,16 @@ describe("validateEnv", () => {
       DATABASE_URL: "postgresql://u:p@localhost:5432/db",
       PORT: 3001,
       JWT_SECRET: SECRET,
-      TRUST_PROXY_HOPS: 1,
     });
   });
 
-  it("coerces PORT and TRUST_PROXY_HOPS from strings", () => {
+  it("coerces PORT from a string", () => {
     const env = validateEnv({
       DATABASE_URL: "postgres://localhost/db",
       JWT_SECRET: SECRET,
       PORT: "4000",
-      TRUST_PROXY_HOPS: "0",
     });
     expect(env.PORT).toBe(4000);
-    expect(env.TRUST_PROXY_HOPS).toBe(0);
   });
 
   it("rejects a missing or non-Postgres DATABASE_URL without echoing its value", () => {
@@ -45,17 +42,5 @@ describe("validateEnv", () => {
     expect(() =>
       validateEnv({ DATABASE_URL: db, JWT_SECRET: "short-but-secret" }),
     ).toThrow(/^(?!.*short-but-secret).*JWT_SECRET/);
-  });
-
-  it("rejects a negative or fractional TRUST_PROXY_HOPS", () => {
-    for (const hops of ["-1", "1.5", "many"]) {
-      expect(() =>
-        validateEnv({
-          DATABASE_URL: "postgres://localhost/db",
-          JWT_SECRET: SECRET,
-          TRUST_PROXY_HOPS: hops,
-        }),
-      ).toThrow(/TRUST_PROXY_HOPS/);
-    }
   });
 });

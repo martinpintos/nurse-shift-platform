@@ -14,6 +14,7 @@ describe("validateEnv", () => {
       DATABASE_URL: "postgresql://u:p@localhost:5432/db",
       PORT: 3001,
       JWT_SECRET: SECRET,
+      POSTHOG_HOST: "https://us.i.posthog.com",
     });
   });
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
-  EMPTY_REFS,
   type AdminShiftListResponse,
+  type AuditLogEntry,
   type AuditLogResponse,
   type OutboxResponse,
   type ResetResponse,
@@ -12,6 +12,7 @@ import type { Principal } from "../auth/principal.js";
 import { Clock, utcToday } from "../common/clock.js";
 import { toOutboxMessageDto } from "../outbox/outbox.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { resolvePeople, resolveRefs } from "../refs/refs.js";
 import { seedDatabase } from "../seed/seed.js";
 import { buildLicenseExport, type LicenseExport } from "./license-export.js";
 import {
@@ -57,8 +58,18 @@ export class AdminService {
           : (row.timesheets.find((t) => t.nurseId === row.claimedById)
               ?.status ?? null),
     }));
-    // Placeholder until names are resolved (redesign step 2).
-    return { shifts: shifts.sort(compareShifts), refs: EMPTY_REFS };
+    // The shifts are the response itself, so refs only names the people on them.
+    const people = await resolvePeople(
+      this.prisma,
+      shifts.flatMap((shift) => [
+        shift.claimedBy,
+        ...shift.cancellations.flatMap((c) => [
+          c.previousNurseId,
+          c.cancelledBy,
+        ]),
+      ]),
+    );
+    return { shifts: shifts.sort(compareShifts), refs: { people, shifts: {} } };
   }
 
   async auditLog(limit: number): Promise<AuditLogResponse> {
@@ -66,7 +77,23 @@ export class AdminService {
       orderBy: { seq: "desc" },
       take: limit,
     });
-    return { entries: rows.map(toAuditLogEntryDto), refs: EMPTY_REFS };
+    const entries = rows.map(toAuditLogEntryDto);
+    const detail = (details: AuditLogEntry["details"], key: string) => {
+      const value = details[key];
+      return typeof value === "string" ? value : null;
+    };
+    const refs = await resolveRefs(this.prisma, {
+      userIds: entries.flatMap((e) => [
+        e.actorId,
+        detail(e.details, "previousNurseId"),
+        detail(e.details, "nurseId"),
+      ]),
+      shiftIds: entries.flatMap((e) => [
+        e.entityType === "shift" ? e.entityId : null,
+        detail(e.details, "shiftId"),
+      ]),
+    });
+    return { entries, refs };
   }
 
   async outbox(): Promise<OutboxResponse> {
@@ -74,7 +101,11 @@ export class AdminService {
       orderBy: { seq: "desc" },
       take: OUTBOX_LIMIT,
     });
-    return { messages: rows.map(toOutboxMessageDto), refs: EMPTY_REFS };
+    const refs = await resolveRefs(this.prisma, {
+      userIds: rows.map((m) => m.recipientId),
+      shiftIds: rows.map((m) => m.shiftId),
+    });
+    return { messages: rows.map(toOutboxMessageDto), refs };
   }
 
   /** Restores the spec's sample data; the reset itself is the new log's first entry. */

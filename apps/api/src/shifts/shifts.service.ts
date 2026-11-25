@@ -27,6 +27,7 @@ import {
 } from "../outbox/outbox.js";
 import type { Tx } from "../prisma/db.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { resolvePeople } from "../refs/refs.js";
 import {
   compareShifts,
   parseDbDate,
@@ -87,8 +88,25 @@ export class ShiftsService {
     if (principal.role === "agency" && agencyOf(principal) !== agencyId) {
       throw new ForbiddenException(ERROR_MESSAGES.notYourAgency);
     }
-    // Placeholder until names are resolved (redesign step 2).
-    return { agencyId, people: {} };
+    // Nurses who hold a claim on the agency's shifts now, or lost one (cancellation history).
+    const [claims, cancellations] = await Promise.all([
+      this.prisma.shift.findMany({
+        where: { agencyId, claimedById: { not: null } },
+        select: { claimedById: true },
+      }),
+      this.prisma.shiftCancellation.findMany({
+        where: { shift: { agencyId } },
+        select: { previousNurseId: true },
+      }),
+    ]);
+    const people = await resolvePeople(this.prisma, [
+      ...claims.map((s) => s.claimedById),
+      ...cancellations.map((c) => c.previousNurseId),
+    ]);
+    const nurses = Object.fromEntries(
+      Object.entries(people).filter(([, person]) => person.role === "nurse"),
+    );
+    return { agencyId, people: nurses };
   }
 
   /** Posts an open shift for the caller's own agency (never one named in the body). */

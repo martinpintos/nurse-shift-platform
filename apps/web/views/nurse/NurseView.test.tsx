@@ -82,9 +82,7 @@ describe("NurseView: shifts", () => {
 
     const claimed = within(myShifts()).getAllByRole("listitem");
     expect(claimed).toHaveLength(1);
-    expect(
-      within(claimed[0]!).getByText("Saturday, October 3"),
-    ).toBeTruthy();
+    expect(within(claimed[0]!).getByText("Saturday, October 3")).toBeTruthy();
     expect(screen.queryByText(/^shift-\d+$/)).toBeNull();
     expect(
       within(myShifts()).getAllByTestId(TEST_IDS.shiftCancelButton),

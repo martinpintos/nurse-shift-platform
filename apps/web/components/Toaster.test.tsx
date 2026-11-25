@@ -139,7 +139,7 @@ describe("Toaster", () => {
     expect(screen.getByTestId(TEST_IDS.notificationBanner)).toBeTruthy();
   });
 
-  it("dismisses a success toast after about 6 seconds", async () => {
+  it("dismisses a success toast after about 10 seconds", async () => {
     vi.useFakeTimers();
     const { actions, click, toasts } = setup();
     click();
@@ -163,7 +163,9 @@ describe("Toaster", () => {
     expect(toasts()).toHaveLength(1);
 
     fireEvent.mouseLeave(screen.getByTestId(TEST_IDS.notificationBanner));
-    await advance(1900);
+    // Resumes with what was left before the hover, not a fresh countdown.
+    const left = SUCCESS_TOAST_MS - 4000;
+    await advance(left - 100);
     expect(toasts()).toHaveLength(1);
     await advance(200);
     expect(toasts()).toHaveLength(0);

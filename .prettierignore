@@ -7,3 +7,5 @@ AGENTS.md
 # Generated
 pnpm-lock.yaml
 **/src/generated/
+# Other sessions' git worktrees (own copies of the repo).
+.claude/worktrees/

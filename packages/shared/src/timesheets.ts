@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IdSchema, IsoDateSchema, Time24hSchema } from "./primitives.js";
+import { RefsSchema } from "./refs.js";
 
 export const TimesheetStatusSchema = z.enum(["submitted", "approved"]);
 export type TimesheetStatus = z.infer<typeof TimesheetStatusSchema>;
@@ -58,5 +59,7 @@ export type Timesheet = z.infer<typeof TimesheetSchema>;
 /** GET /api/timesheets 200 response: own (nurse), own shifts (agency), all (admin). */
 export const TimesheetListResponseSchema = z.strictObject({
   timesheets: z.array(TimesheetSchema),
+  /** Names for the nurses, approvers and shifts the timesheets reference. */
+  refs: RefsSchema,
 });
 export type TimesheetListResponse = z.infer<typeof TimesheetListResponseSchema>;

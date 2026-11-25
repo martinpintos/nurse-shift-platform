@@ -16,6 +16,7 @@ import {
   outboxMessage,
   shift2,
   submittedTimesheet,
+  refs,
 } from "../../test/fixtures";
 import { renderApp } from "../../test/render";
 import { POLL_INTERVAL_MS } from "../../lib/use-polling";
@@ -36,10 +37,10 @@ function renderAdmin(routes: Record<string, RouteHandler> = {}) {
     {
       user: admin,
       routes: {
-        "GET /api/admin/shifts": { shifts: adminShifts },
-        "GET /api/admin/audit-log": { entries: [auditEntry] },
-        "GET /api/admin/outbox": { messages: [outboxMessage] },
-        "GET /api/timesheets": { timesheets: [submittedTimesheet] },
+        "GET /api/admin/shifts": { shifts: adminShifts, refs },
+        "GET /api/admin/audit-log": { entries: [auditEntry], refs },
+        "GET /api/admin/outbox": { messages: [outboxMessage], refs },
+        "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
         ...routes,
       },
     },
@@ -77,11 +78,12 @@ describe("AdminView", () => {
         .getAllByTestId(TEST_IDS.adminShiftStatusBadge)
         .map((badge) => badge.textContent),
     ).toEqual(["open", "filled", "open"]);
-    expect(within(rows[1]!).getByText("nurse-1")).toBeTruthy();
-    // shift-1's history: a no-show by nurse-2, reported by agency-a.
-    expect(within(rows[0]!).getByText("No-show")).toBeTruthy();
-    expect(within(rows[0]!).getByText("nurse-2")).toBeTruthy();
-    expect(within(rows[0]!).getByText("agency-a")).toBeTruthy();
+    // Names, not ids; the shift id stays as secondary detail.
+    expect(within(rows[1]!).getByText("Maria Lopez")).toBeTruthy();
+    expect(within(rows[1]!).queryByText("nurse-1")).toBeNull();
+    expect(within(rows[1]!).getByText("shift-2")).toBeTruthy();
+    // shift-1's history: one no-show.
+    expect(within(rows[0]!).getByText("1 no-show")).toBeTruthy();
 
     // Cancel only on the filled row.
     expect(
@@ -94,9 +96,49 @@ describe("AdminView", () => {
       within(rows[2]!).queryByTestId(TEST_IDS.shiftCancelButton),
     ).toBeNull();
 
-    expect(screen.getByTestId(TEST_IDS.auditLogTable)).toBeTruthy();
     expect(screen.getByTestId(TEST_IDS.timesheetTable)).toBeTruthy();
     expect(screen.getByText("Your shift was cancelled")).toBeTruthy();
+  });
+
+  it("shows the audit log as plain sentences with names", async () => {
+    renderAdmin();
+    const log = await screen.findByTestId(TEST_IDS.auditLogTable);
+    expect(within(log).getByText("Shift cancelled")).toBeTruthy();
+    expect(
+      within(log).getByText(
+        "Sunrise Health Staffing reported James Cook as a no-show on shift-1, RN at Sunrise Health Staffing",
+      ),
+    ).toBeTruthy();
+    expect(within(log).queryByText(/nurse-2|agency-a/)).toBeNull();
+    // A relative time, with the full date on hover.
+    const time = log.querySelector("time");
+    expect(time?.getAttribute("title")).toMatch(/2026/);
+  });
+
+  it("leads with coverage KPIs computed from the shifts", async () => {
+    renderAdmin();
+    const kpis = await screen.findByLabelText("Coverage summary");
+    // Seed: shift-1 and shift-3 open, shift-2 filled; one no-show on shift-1.
+    expect(kpis.textContent).toContain("Needs coverage2");
+    expect(kpis.textContent).toContain("Filled1");
+    expect(kpis.textContent).toContain("Coverage rate33%");
+    expect(kpis.textContent).toContain("Cancellations1");
+    expect(kpis.textContent).toContain("Timesheets pending1");
+  });
+
+  it("filters by agency and status tab, with counts that follow the filter", async () => {
+    renderAdmin();
+    const table = await screen.findByTestId(TEST_IDS.adminDashboardShiftTable);
+    fireEvent.change(screen.getByLabelText("Agency"), {
+      target: { value: "agency-b" },
+    });
+    expect(within(table).getAllByRole("row").slice(1)).toHaveLength(1);
+    expect(
+      screen.getByRole("tab", { name: /Needs coverage/ }).textContent,
+    ).toBe("Needs coverage1");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Filled/ }));
+    expect(within(table).getByText("No shifts in this view.")).toBeTruthy();
   });
 
   it("polls every 5 seconds and pauses while the tab is hidden", async () => {
@@ -169,7 +211,15 @@ describe("AdminView", () => {
       reason: "no-show",
     });
     expect(confirm).not.toHaveBeenCalled();
-    // Every feed refreshes so the history and audit log show the cancellation.
+    // The reopened shift from the response updates the row before the toast.
+    const badges = within(table).getAllByTestId(TEST_IDS.adminShiftStatusBadge);
+    expect(badges.map((badge) => badge.textContent)).toEqual([
+      "open",
+      "open",
+      "open",
+    ]);
+    expect(within(table).queryByTestId(TEST_IDS.shiftCancelButton)).toBeNull();
+    // The audit log and outbox refresh to show the cancellation.
     await waitFor(() =>
       expect(api.callsTo("GET /api/admin/audit-log")).toHaveLength(2),
     );
@@ -208,16 +258,23 @@ describe("AdminView", () => {
     click.mockRestore();
   });
 
-  it("resets demo data after a native confirm", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("resets demo data after confirming in the in-app dialog, never window.confirm", async () => {
+    const confirm = vi.spyOn(window, "confirm");
     const { api } = renderAdmin({
       "POST /api/admin/reset": { status: "reset" },
     });
     await screen.findByTestId(TEST_IDS.adminDashboardShiftTable);
 
     fireEvent.click(screen.getByRole("button", { name: "Reset demo data" }));
+    const dialog = screen.getByRole("dialog", { name: "Reset demo data?" });
+    expect(dialog.textContent).toContain(RESET_CONFIRM_MESSAGE);
+    expect(api.callsTo("POST /api/admin/reset")).toHaveLength(0);
 
-    expect(confirm).toHaveBeenCalledWith(RESET_CONFIRM_MESSAGE);
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Reset demo data" }),
+    );
+
+    expect(confirm).not.toHaveBeenCalled();
     await waitFor(() => expect(banner().textContent).toBe("Demo data reset"));
     expect(api.callsTo("POST /api/admin/reset")).toHaveLength(1);
     await waitFor(() =>
@@ -226,13 +283,15 @@ describe("AdminView", () => {
   });
 
   it("does nothing when the reset is not confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     const { api } = renderAdmin();
     await screen.findByTestId(TEST_IDS.adminDashboardShiftTable);
 
     fireEvent.click(screen.getByRole("button", { name: "Reset demo data" }));
+    const dialog = screen.getByRole("dialog", { name: "Reset demo data?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep data" }));
 
+    expect(dialog.hasAttribute("open")).toBe(false);
     expect(api.callsTo("POST /api/admin/reset")).toHaveLength(0);
-    expect(banner().textContent).toBe("");
+    expect(screen.queryByTestId(TEST_IDS.notificationBanner)).toBeNull();
   });
 });

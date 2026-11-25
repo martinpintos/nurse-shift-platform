@@ -2,6 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtSigner, type JwtClaims } from "@nestjs/authentication";
 import {
   AdminShiftListResponseSchema,
+  AgencyPeopleResponseSchema,
   AgencyShiftListResponseSchema,
   AuditLogResponseSchema,
   CancelShiftResponseSchema,
@@ -282,6 +283,15 @@ describe("contract: every route in ROUTES", () => {
             .get("/api/agencies/agency-a/shifts")
             .set(bearer(tokens["agency-a"])),
           AgencyShiftListResponseSchema,
+          200,
+        ),
+      "GET /api/agencies/:agencyId/people": () =>
+        success(
+          t
+            .http()
+            .get("/api/agencies/agency-a/people")
+            .set(bearer(tokens["agency-a"])),
+          AgencyPeopleResponseSchema,
           200,
         ),
       "GET /api/health": () =>

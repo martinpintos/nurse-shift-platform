@@ -2,7 +2,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { TEST_IDS, type TestId } from "@repo/shared";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { useEffect, type ReactElement } from "react";
+import { useNotifications } from "../lib/notifications";
 import { describe, expect, it } from "vitest";
 import { RequireRole } from "../components/RoleRouting";
 import type { RouteHandler } from "../test/fetch-mock";
@@ -18,6 +19,7 @@ import {
   shift1,
   shift2,
   submittedTimesheet,
+  refs,
 } from "../test/fixtures";
 import { renderApp } from "../test/render";
 import { AdminView } from "./admin/AdminView";
@@ -41,7 +43,7 @@ const EXPECTED_ELEMENT: Record<TestId, string> = {
   "admin-shift-status-badge": "span",
   "audit-log-table": "table",
   "timesheet-table": "table",
-  "notification-banner": "div[role=status][aria-live=polite]",
+  "notification-banner": "div[role=status][data-variant]",
 };
 
 const views: {
@@ -68,7 +70,7 @@ const views: {
     user: nurse,
     routes: {
       "GET /api/shifts": { shifts: seedShifts },
-      "GET /api/timesheets": { timesheets: [] },
+      "GET /api/timesheets": { timesheets: [], refs },
       "GET /api/credentials": { credentials: [credential] },
     },
     ready: () => screen.findAllByTestId(TEST_IDS.shiftCancelButton),
@@ -86,7 +88,7 @@ const views: {
         agencyId: "agency-a",
         shifts: [shift1, shift2],
       },
-      "GET /api/timesheets": { timesheets: [submittedTimesheet] },
+      "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
     },
     ready: async () => {
       await screen.findAllByTestId(TEST_IDS.shiftCancelButton);
@@ -102,14 +104,20 @@ const views: {
     ),
     user: admin,
     routes: {
-      "GET /api/admin/shifts": { shifts: adminShifts },
-      "GET /api/admin/audit-log": { entries: [auditEntry] },
-      "GET /api/admin/outbox": { messages: [outboxMessage] },
-      "GET /api/timesheets": { timesheets: [submittedTimesheet] },
+      "GET /api/admin/shifts": { shifts: adminShifts, refs },
+      "GET /api/admin/audit-log": { entries: [auditEntry], refs },
+      "GET /api/admin/outbox": { messages: [outboxMessage], refs },
+      "GET /api/timesheets": { timesheets: [submittedTimesheet], refs },
     },
     ready: () => screen.findAllByTestId(TEST_IDS.adminShiftStatusBadge),
   },
 ];
+
+function NotifyOnMount() {
+  const { notifySuccess } = useNotifications();
+  useEffect(() => notifySuccess("Shift claimed"), [notifySuccess]);
+  return null;
+}
 
 describe("required test IDs", () => {
   it("renders every one of the 15 TEST_IDS somewhere in the app, on the acting element", async () => {
@@ -136,13 +144,18 @@ describe("required test IDs", () => {
       cleanup();
     }
 
+    // The toast exists only while it reports an action; check it on its own.
+    renderApp(<NotifyOnMount />);
+    const toast = await screen.findByTestId(TEST_IDS.notificationBanner);
+    expect(toast.matches(EXPECTED_ELEMENT[TEST_IDS.notificationBanner])).toBe(
+      true,
+    );
+    seen.set(TEST_IDS.notificationBanner, new Set(["toast"]));
+    cleanup();
+
     const required = Object.values(TEST_IDS);
     expect(required).toHaveLength(15);
     expect([...seen.keys()].sort()).toEqual([...required].sort());
-    // The one banner is on every screen.
-    expect([...(seen.get(TEST_IDS.notificationBanner) ?? [])].sort()).toEqual(
-      views.map((view) => view.name).sort(),
-    );
   });
 
   it("uses test IDs only through TEST_IDS, never as string literals", () => {

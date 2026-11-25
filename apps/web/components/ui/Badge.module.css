@@ -1,0 +1,63 @@
+/* A pale tint with dark text of the same hue, as in docs/design. Never squeezed. */
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.status {
+  text-transform: capitalize;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--badge-dot);
+}
+
+.badge[data-tone="warning"] {
+  --badge-bg: var(--tone-warning-bg);
+  --badge-text: var(--tone-warning-text);
+  --badge-border: var(--tone-warning-border);
+  --badge-dot: var(--tone-warning-dot);
+}
+
+.badge[data-tone="success"] {
+  --badge-bg: var(--tone-success-bg);
+  --badge-text: var(--tone-success-text);
+  --badge-border: var(--tone-success-border);
+  --badge-dot: var(--tone-success-dot);
+}
+
+.badge[data-tone="danger"] {
+  --badge-bg: var(--tone-danger-bg);
+  --badge-text: var(--tone-danger-text);
+  --badge-border: var(--tone-danger-border);
+  --badge-dot: var(--tone-danger-dot);
+}
+
+.badge[data-tone="neutral"] {
+  --badge-bg: var(--tone-neutral-bg);
+  --badge-text: var(--tone-neutral-text);
+  --badge-border: var(--tone-neutral-border);
+  --badge-dot: var(--tone-neutral-dot);
+}
+
+.badge[data-tone="info"] {
+  --badge-bg: var(--tone-info-bg);
+  --badge-text: var(--tone-info-text);
+  --badge-border: var(--tone-info-border);
+  --badge-dot: var(--tone-info-dot);
+}

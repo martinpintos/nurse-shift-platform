@@ -1,0 +1,9 @@
+.panel {
+  display: contents;
+}
+
+@media (max-width: 959.98px) {
+  .panel[data-inactive] {
+    display: none;
+  }
+}

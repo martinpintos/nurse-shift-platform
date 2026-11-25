@@ -16,7 +16,10 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { Badge } from "../../components/ui";
+import { StatusBadge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Field";
+import styles from "./CredentialsPanel.module.css";
 import { errorMessage } from "../../lib/api";
 import { saveBlob } from "../../lib/download";
 import { formatBytes, formatDateTime, formatPlainDate } from "../../lib/format";
@@ -74,17 +77,16 @@ function isCompleteExpiry(value: string): boolean {
   );
 }
 
-function credentialTone(credential: Credential) {
-  return credential.status === "valid" ? "success" : "danger";
-}
-
 /** The newest-expiring credential: the one claims are checked against. */
-function currentCredential(credentials: Credential[]): Credential | undefined {
+export function currentCredential(
+  credentials: Credential[],
+): Credential | undefined {
   return [...credentials].sort((a, b) =>
     b.expiresOn.localeCompare(a.expiresOn),
   )[0];
 }
 
+/** One line on whether the nurse can claim: valid until, expired on, or nothing on file. */
 export function CredentialStatusNote({
   credentials,
 }: {
@@ -94,33 +96,40 @@ export function CredentialStatusNote({
   const current = currentCredential(credentials);
   if (!current) {
     return (
-      <p className="callout" data-tone="warning">
+      <p className={styles.status} data-tone="warning">
         No license on file. Upload your license to claim shifts.
       </p>
     );
   }
   if (current.status === "expired") {
     return (
-      <p className="callout" data-tone="danger">
+      <p className={styles.status} data-tone="danger">
         Your license expired on {formatPlainDate(current.expiresOn)}. Upload a
         renewed license to claim shifts.
       </p>
     );
   }
   return (
-    <p className="callout" data-tone="success">
-      License valid until {formatPlainDate(current.expiresOn)}. Claims are
-      checked against each shift’s date.
+    <p className={styles.status} data-tone="success">
+      Valid until {formatPlainDate(current.expiresOn)}
     </p>
   );
 }
 
+/** Earlier documents beyond this many are behind "Show all". */
+const VISIBLE_DOCUMENTS = 1;
+
+/**
+ * The license card: upload a renewal (it uploads by itself once a file and an expiry date
+ * are set), and the documents on file. The uploaded credential from the API's response is
+ * handed to `onUploaded` before the success toast.
+ */
 export function CredentialsPanel({
   credentials,
   onUploaded,
 }: {
   credentials: Credential[];
-  onUploaded: () => void;
+  onUploaded: (credential: Credential) => void;
 }) {
   const api = useApi();
   const { notifyError } = useNotifications();
@@ -128,6 +137,7 @@ export function CredentialsPanel({
   const [file, setFile] = useState<File | null>(null);
   const [expiresOn, setExpiresOn] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   // A ref, not state: two change events in one tick must not start two uploads.
   const uploading = useRef(false);
@@ -141,14 +151,13 @@ export function CredentialsPanel({
     const done = await run(
       "upload",
       () => api.uploadCredential(nextFile, nextExpiry),
-      SUCCESS_MESSAGES.credentialUploaded,
+      { success: SUCCESS_MESSAGES.credentialUploaded, apply: onUploaded },
     );
     uploading.current = false;
     if (done) {
       setFile(null);
       setExpiresOn("");
       if (fileInput.current) fileInput.current.value = "";
-      onUploaded();
     }
   }
 
@@ -210,92 +219,106 @@ export function CredentialsPanel({
   }
 
   const busy = pending !== null;
+  const sorted = [...credentials].sort((a, b) =>
+    b.uploadedAt.localeCompare(a.uploadedAt),
+  );
+  const visible = showAll ? sorted : sorted.slice(0, VISIBLE_DOCUMENTS);
+  const hidden = sorted.length - visible.length;
 
   return (
-    <>
-      <form
-        className="upload-form"
-        onSubmit={onSubmit}
-        aria-describedby={hintId}
-      >
-        <p id={hintId} className="field-hint">
-          PDF, PNG or JPEG, up to {formatBytes(MAX_CREDENTIAL_BYTES)}. It
-          uploads as soon as you pick a file and an expiry date.
-        </p>
-        <div className="field">
-          <label htmlFor={fileId}>License document</label>
-          <input
+    <div className={styles.panel}>
+      <div className={styles.onFile}>
+        <CredentialStatusNote credentials={credentials} />
+        {sorted.length === 0 ? (
+          <p className={styles.none}>No license documents uploaded yet.</p>
+        ) : (
+          <div className={styles.documents}>
+            <ul className={styles.list} aria-label="Your license documents">
+              {visible.map((credential) => (
+                <li key={credential.id} className={styles.document}>
+                  <div className={styles.documentMain}>
+                    <span className={styles.fileName}>
+                      {credential.fileName}
+                    </span>
+                    <span className={styles.meta}>
+                      Expires{" "}
+                      <strong>{formatPlainDate(credential.expiresOn)}</strong>
+                      {" · "}
+                      {formatBytes(credential.sizeBytes)}
+                      {" · uploaded "}
+                      {formatDateTime(credential.uploadedAt)}
+                    </span>
+                  </div>
+                  <div className={styles.documentActions}>
+                    <StatusBadge kind="credential" status={credential.status} />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      busy={downloadingId === credential.id}
+                      aria-label={`Download ${credential.fileName}`}
+                      onClick={() => void download(credential)}
+                    >
+                      {downloadingId === credential.id
+                        ? "Downloading…"
+                        : "Download"}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {hidden > 0 || showAll ? (
+              <button
+                type="button"
+                className={styles.more}
+                aria-expanded={showAll}
+                onClick={() => setShowAll((value) => !value)}
+              >
+                {showAll ? "Show fewer" : `Show all ${sorted.length} documents`}
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
+      <form className={styles.form} onSubmit={onSubmit}>
+        <div className={styles.field}>
+          <label htmlFor={fileId} className={styles.label}>
+            Upload a renewal
+          </label>
+          <Input
             ref={fileInput}
             id={fileId}
-            className="input input-file"
             type="file"
             name="file"
             accept={ACCEPT}
+            aria-describedby={hintId}
             onChange={onFileChange}
             data-testid={TEST_IDS.credentialUploadInput}
           />
+          <p id={hintId} className={styles.hint}>
+            PDF, PNG or JPEG, up to {formatBytes(MAX_CREDENTIAL_BYTES)}. It
+            uploads once the expiry date is set.
+          </p>
         </div>
-        <div className="field">
-          <label htmlFor={expiryId}>Expiry date</label>
-          <input
-            id={expiryId}
-            className="input"
-            type="date"
-            name="expiresOn"
-            placeholder="YYYY-MM-DD"
-            value={expiresOn}
-            onChange={onExpiryChange}
-            data-testid={TEST_IDS.credentialExpiryDateInput}
-          />
+        <div className={styles.expiryRow}>
+          <div className={styles.field}>
+            <label htmlFor={expiryId} className={styles.label}>
+              Expiry date
+            </label>
+            <Input
+              id={expiryId}
+              type="date"
+              name="expiresOn"
+              placeholder="YYYY-MM-DD"
+              value={expiresOn}
+              onChange={onExpiryChange}
+              data-testid={TEST_IDS.credentialExpiryDateInput}
+            />
+          </div>
+          <Button type="submit" variant="secondary" busy={busy}>
+            {busy ? "Uploading…" : "Upload"}
+          </Button>
         </div>
-        <button
-          type="submit"
-          className="btn btn-secondary"
-          aria-disabled={busy || undefined}
-        >
-          {busy ? "Uploading…" : "Upload"}
-        </button>
       </form>
-
-      {credentials.length === 0 ? (
-        <p className="section-state muted">
-          No license documents uploaded yet.
-        </p>
-      ) : (
-        <ul className="credential-list" aria-label="Your license documents">
-          {credentials.map((credential) => (
-            <li key={credential.id} className="credential-item">
-              <div className="credential-main">
-                <span className="credential-name">{credential.fileName}</span>
-                <span className="muted small">
-                  {formatBytes(credential.sizeBytes)} · uploaded{" "}
-                  {formatDateTime(credential.uploadedAt)}
-                </span>
-              </div>
-              <div className="credential-meta">
-                <span className="small">
-                  Expires{" "}
-                  <strong>{formatPlainDate(credential.expiresOn)}</strong>
-                </span>
-                <Badge tone={credentialTone(credential)}>
-                  {credential.status}
-                </Badge>
-                <button
-                  type="button"
-                  className="btn btn-link btn-small"
-                  aria-label={`Download ${credential.fileName}`}
-                  aria-disabled={downloadingId === credential.id || undefined}
-                  onClick={() => void download(credential)}
-                >
-                  {downloadingId === credential.id
-                    ? "Downloading…"
-                    : "Download"}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+    </div>
   );
 }

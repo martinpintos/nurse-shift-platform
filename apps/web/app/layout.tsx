@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Providers } from "../components/Providers";
+import "./tokens.css";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -20,10 +21,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f7f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d1114" },
-  ],
+  // Light theme only; the mobile top bar is navy.
+  themeColor: "#0f1f3a",
 };
 
 export default function RootLayout({

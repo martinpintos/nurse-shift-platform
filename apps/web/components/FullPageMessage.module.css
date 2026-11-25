@@ -1,0 +1,23 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.body {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+}
+
+.skeleton {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  width: 240px;
+}

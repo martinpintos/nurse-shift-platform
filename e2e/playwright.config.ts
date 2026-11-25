@@ -11,9 +11,13 @@ import { defineConfig, devices } from "@playwright/test";
 const remote = process.env["E2E_BASE_URL"];
 const baseURL = remote ?? "http://localhost:3000";
 const ci = Boolean(process.env["CI"]);
+// Screenshots of every view are a design check, not a test: `pnpm --filter e2e screens`.
+const screens = Boolean(process.env["SCREENS"]);
 
 export default defineConfig({
   testDir: "./tests",
+  grep: screens ? /@screens/ : undefined,
+  grepInvert: screens ? undefined : /@screens/,
   fullyParallel: false,
   workers: 1,
   retries: ci ? 1 : 0,

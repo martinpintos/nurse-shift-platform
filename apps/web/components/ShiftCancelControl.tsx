@@ -5,11 +5,15 @@ import {
   SUCCESS_MESSAGES,
   TEST_IDS,
   type CancelReason,
+  type CancelShiftResponse,
 } from "@repo/shared";
 import { useId, useState } from "react";
 import { CANCEL_REASON_LABEL } from "../lib/format";
 import { useApi } from "../lib/session";
 import { useAction } from "../lib/use-action";
+import { Button } from "./ui/Button";
+import { Select } from "./ui/Field";
+import styles from "./ShiftCancelControl.module.css";
 
 export interface CancelReasonOption {
   value: CancelReason;
@@ -35,8 +39,9 @@ export const STAFF_CANCEL_OPTIONS: CancelReasonOption[] = [
 ];
 
 /**
- * A reason select (defaulting to the first allowed option) and the cancel button. One click
- * cancels: no modal, no confirm. The result goes to the notification banner.
+ * A reason select (defaulting to the first allowed option) and the cancel button, side by
+ * side. One click cancels: no dialog. The reopened shift from the API's response goes to
+ * `onCancelled` before the success toast.
  */
 export function ShiftCancelControl({
   shiftId,
@@ -45,10 +50,10 @@ export function ShiftCancelControl({
   onCancelled,
 }: {
   shiftId: string;
-  /** Spoken context for the button and select, e.g. "RN shift on Fri, Oct 3". */
+  /** Spoken context for the button and select, e.g. "RN shift shift-1 on Fri, Oct 2". */
   shiftLabel: string;
   options: CancelReasonOption[];
-  onCancelled: () => void;
+  onCancelled: (result: CancelShiftResponse) => void;
 }) {
   const api = useApi();
   const { run, pending } = useAction();
@@ -60,22 +65,21 @@ export function ShiftCancelControl({
 
   async function cancel() {
     if (busy) return;
-    const done = await run(
-      "cancel",
-      () => api.cancelShift(shiftId, reason),
-      SUCCESS_MESSAGES.shiftCancelled,
-    );
-    if (done) onCancelled();
+    await run("cancel", () => api.cancelShift(shiftId, reason), {
+      success: SUCCESS_MESSAGES.shiftCancelled,
+      apply: onCancelled,
+    });
   }
 
   return (
-    <div className="cancel-control">
+    <div className={styles.control}>
       <label htmlFor={selectId} className="visually-hidden">
         Cancellation reason for {shiftLabel}
       </label>
-      <select
+      <Select
         id={selectId}
-        className="select select-small"
+        size="sm"
+        className={styles.reason}
         value={reason}
         onChange={(event) =>
           setReason(CancelReasonSchema.parse(event.target.value))
@@ -90,17 +94,17 @@ export function ShiftCancelControl({
             {option.label}
           </option>
         ))}
-      </select>
-      <button
-        type="button"
-        className="btn btn-danger btn-small"
+      </Select>
+      <Button
+        variant="danger"
+        size="sm"
+        busy={busy}
         data-testid={TEST_IDS.shiftCancelButton}
         aria-label={`Cancel ${shiftLabel}`}
-        aria-disabled={busy || undefined}
-        onClick={cancel}
+        onClick={() => void cancel()}
       >
         {busy ? "Cancelling…" : "Cancel shift"}
-      </button>
+      </Button>
     </div>
   );
 }

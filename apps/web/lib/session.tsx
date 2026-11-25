@@ -74,7 +74,7 @@ async function resolveSession(api: ApiClient): Promise<SessionState> {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { notifyError } = useNotifications();
+  const { notifyError, clear: clearNotification } = useNotifications();
   // Starts as "loading" on the server and the client alike, so hydration matches.
   const [state, setState] = useState<SessionState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
@@ -86,9 +86,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         onUnauthorized: (message) => {
           clearToken();
           setState({ status: "anonymous" });
-          // Say why on the login page, e.g. "Invalid or expired token".
-          notifyError(message);
           router.replace(LOGIN_PATH);
+          // Say why on the login page, e.g. "Invalid or expired token". Scoped to /login,
+          // so the route change that is about to happen doesn't drop it.
+          notifyError(message, { scope: LOGIN_PATH });
         },
       }),
     [router, notifyError],
@@ -123,9 +124,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearToken();
+    clearNotification();
     setState({ status: "anonymous" });
     router.replace(LOGIN_PATH);
-  }, [router]);
+  }, [router, clearNotification]);
 
   const retry = useCallback(() => {
     setState({ status: "loading" });

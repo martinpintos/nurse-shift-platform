@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  EMPTY_REFS,
   ERROR_MESSAGES,
   timesheetMinutes,
   type SubmitTimesheetRequest,
@@ -68,7 +69,8 @@ export class TimesheetsService {
       include: withShift,
       orderBy: [{ submittedAt: "desc" }, { id: "asc" }],
     });
-    return { timesheets: rows.map(toTimesheetDto) };
+    // Placeholder until names are resolved (redesign step 2).
+    return { timesheets: rows.map(toTimesheetDto), refs: EMPTY_REFS };
   }
 
   /** A nurse submits actual hours for a shift she holds the claim on, once. */

@@ -12,3 +12,10 @@ export const router: Record<RouterMethod, Mock> = {
   forward: vi.fn(),
   prefetch: vi.fn(),
 };
+
+/** The pathname `usePathname()` returns. Tests set it to simulate a route change. */
+export const pathname = { current: "/" };
+
+export function setPathname(next: string): void {
+  pathname.current = next;
+}

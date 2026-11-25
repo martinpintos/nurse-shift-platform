@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { UserRoleSchema } from "./auth.js";
 import { IdSchema } from "./primitives.js";
+import { RefsSchema } from "./refs.js";
 import { CancelReasonSchema, ShiftSchema } from "./shifts.js";
 import { TimesheetStatusSchema } from "./timesheets.js";
 
@@ -28,6 +29,8 @@ export type AdminShift = z.infer<typeof AdminShiftSchema>;
 /** GET /api/admin/shifts 200 response (polled by the dashboard). */
 export const AdminShiftListResponseSchema = z.strictObject({
   shifts: z.array(AdminShiftSchema),
+  /** Names for the nurses and actors the shifts reference. */
+  refs: RefsSchema,
 });
 export type AdminShiftListResponse = z.infer<
   typeof AdminShiftListResponseSchema
@@ -77,9 +80,13 @@ export const AuditLogQuerySchema = z.object({
 });
 export type AuditLogQuery = z.infer<typeof AuditLogQuerySchema>;
 
-/** GET /api/admin/audit-log 200 response. */
+/**
+ * GET /api/admin/audit-log 200 response. Entries stay ids only; `refs` names the actors,
+ * nurses and shifts they reference, resolved when the log is read.
+ */
 export const AuditLogResponseSchema = z.strictObject({
   entries: z.array(AuditLogEntrySchema),
+  refs: RefsSchema,
 });
 export type AuditLogResponse = z.infer<typeof AuditLogResponseSchema>;
 
@@ -105,6 +112,8 @@ export type OutboxMessage = z.infer<typeof OutboxMessageSchema>;
 /** GET /api/admin/outbox 200 response, newest first. */
 export const OutboxResponseSchema = z.strictObject({
   messages: z.array(OutboxMessageSchema),
+  /** Names for the recipients and shifts the messages reference. */
+  refs: RefsSchema,
 });
 export type OutboxResponse = z.infer<typeof OutboxResponseSchema>;
 

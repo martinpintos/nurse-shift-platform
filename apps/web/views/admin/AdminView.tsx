@@ -4,243 +4,247 @@ import {
   SUCCESS_MESSAGES,
   TEST_IDS,
   type AdminShift,
+  type AdminShiftListResponse,
   type AuditLogEntry,
+  type CancelShiftResponse,
   type OutboxMessage,
 } from "@repo/shared";
-import { useCallback } from "react";
+import { useCallback, useId, useState } from "react";
 import {
   STAFF_CANCEL_OPTIONS,
   ShiftCancelControl,
 } from "../../components/ShiftCancelControl";
 import {
-  ShiftWhen,
+  ShiftHours,
   byDateAndTime,
+  replaceShift,
   shiftLabel,
-  shiftStatusTone,
 } from "../../components/ShiftSummary";
 import { TimesheetTable } from "../../components/TimesheetTable";
+import { Panel } from "../../components/shell/Panel";
+import { StatusBadge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { ConfirmDialog } from "../../components/ui/Dialog";
+import { Select } from "../../components/ui/Field";
+import { DownloadIcon, ResetIcon } from "../../components/ui/icons";
+import { Kpi, KpiGrid } from "../../components/ui/Kpi";
+import { ListPanel } from "../../components/ui/List";
+import { RelativeTime } from "../../components/ui/RelativeTime";
 import {
-  Badge,
+  EmptyState,
+  LoadError,
   PageHeader,
+  PageStack,
   Section,
-  SectionState,
-  TableScroll,
-  VisuallyHidden,
-} from "../../components/ui";
+} from "../../components/ui/Section";
 import {
-  AUDIT_ACTION_LABEL,
-  CANCEL_REASON_LABEL,
-  formatClockTime,
-  formatDateTime,
-} from "../../lib/format";
+  KpiSkeleton,
+  ListSkeleton,
+  TableSkeleton,
+} from "../../components/ui/Skeleton";
+import { CellStack, EmptyRow, Table, Td, Th } from "../../components/ui/Table";
+import { Tabs, tabPanelProps } from "../../components/ui/Tabs";
+import { IdText } from "../../components/ui/Text";
+import { describeActivity } from "../../lib/activity";
 import { saveBlob } from "../../lib/download";
+import { formatDay } from "../../lib/format";
+import { createLookup, type Lookup } from "../../lib/lookup";
 import { useApi } from "../../lib/session";
 import { useAction } from "../../lib/use-action";
 import { POLL_INTERVAL_MS, usePolling } from "../../lib/use-polling";
 import { useResource } from "../../lib/use-resource";
+import styles from "./AdminView.module.css";
 
 export const RESET_CONFIRM_MESSAGE =
-  "Reset all demo data to the sample data? Shifts, claims, cancellations, timesheets and uploads made during the demo are removed.";
+  "Shifts, claims, cancellations, timesheets and uploads made during the demo are removed, and the sample data comes back.";
 
-function CancellationHistory({ shift }: { shift: AdminShift }) {
-  if (shift.cancellations.length === 0) return <span className="muted">—</span>;
-  return (
-    <ul className="history">
-      {shift.cancellations.map((record) => (
-        <li key={`${record.cancelledAt}-${record.previousNurseId}`}>
-          <Badge tone={record.reason === "no-show" ? "danger" : "neutral"}>
-            {CANCEL_REASON_LABEL[record.reason]}
-          </Badge>
-          <span className="history-text">
-            <span className="mono">{record.previousNurseId}</span> released by{" "}
-            <span className="mono">{record.cancelledBy}</span> (
-            {record.cancelledByRole})
-            <span className="cell-note">
-              <time dateTime={record.cancelledAt}>
-                {formatDateTime(record.cancelledAt)}
-              </time>
-            </span>
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
+type CoverageTab = "open" | "filled" | "all";
+
+const ALL_AGENCIES = "all";
+
+/** Rows of recent activity shown before "Show all". */
+const RECENT_ACTIVITY = 8;
+/** Outbox messages shown before "Show all". */
+const RECENT_MESSAGES = 4;
+
+/** "1 no-show", "2 cancelled", or both: the shift's cancellation history in brief. */
+function historyNote(shift: AdminShift): string | null {
+  const noShows = shift.cancellations.filter(
+    (record) => record.reason === "no-show",
+  ).length;
+  const advance = shift.cancellations.length - noShows;
+  const parts = [
+    noShows > 0 ? `${noShows} no-show${noShows === 1 ? "" : "s"}` : null,
+    advance > 0 ? `${advance} cancelled` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-function AdminShiftTable({
+function CoverageTable({
   shifts,
-  onChanged,
+  lookup,
+  onCancelled,
 }: {
   shifts: AdminShift[];
-  onChanged: () => void;
+  lookup: Lookup;
+  onCancelled: (result: CancelShiftResponse) => void;
 }) {
   return (
-    <TableScroll label="All shifts table">
-      <table
-        className="data-table"
-        data-testid={TEST_IDS.adminDashboardShiftTable}
-      >
-        <thead>
-          <tr>
-            <th scope="col">Shift</th>
-            <th scope="col">When</th>
-            <th scope="col">Status</th>
-            <th scope="col">Nurse</th>
-            <th scope="col">Cancellations</th>
-            <th scope="col">
-              <VisuallyHidden>Actions</VisuallyHidden>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {shifts.length === 0 ? (
-            <tr>
-              <td className="empty-row" colSpan={6}>
-                No shifts yet.
-              </td>
-            </tr>
-          ) : (
-            shifts.map((shift) => (
+    <Table label="Shift coverage" testId={TEST_IDS.adminDashboardShiftTable}>
+      <thead>
+        <tr>
+          <Th>Date</Th>
+          <Th>Role</Th>
+          <Th>Agency</Th>
+          <Th>Hours</Th>
+          <Th>Assigned nurse</Th>
+          <Th>Status</Th>
+          <Th>
+            <span className="visually-hidden">Actions</span>
+          </Th>
+        </tr>
+      </thead>
+      <tbody>
+        {shifts.length === 0 ? (
+          <EmptyRow colSpan={7}>No shifts in this view.</EmptyRow>
+        ) : (
+          shifts.map((shift) => {
+            const history = historyNote(shift);
+            return (
               <tr key={shift.id}>
-                <td>
-                  <span className="shift-id-line">
-                    <span className="mono">{shift.id}</span>
-                    <Badge tone="neutral">{shift.role}</Badge>
-                  </span>
-                  <span className="cell-note nowrap">{shift.agencyName}</span>
-                </td>
-                <td>
-                  <ShiftWhen shift={shift} />
-                </td>
-                <td>
-                  <Badge
-                    tone={shiftStatusTone(shift.status)}
-                    testId={TEST_IDS.adminShiftStatusBadge}
-                  >
-                    {shift.status}
-                  </Badge>
-                </td>
-                <td>
+                <Td label="Date">
+                  <CellStack
+                    primary={
+                      <strong className="nowrap">
+                        {formatDay(shift.date)}
+                      </strong>
+                    }
+                    secondary={shift.id}
+                  />
+                </Td>
+                <Td label="Role">{shift.role}</Td>
+                <Td label="Agency">{shift.agencyName}</Td>
+                <Td label="Hours">
+                  <ShiftHours shift={shift} />
+                </Td>
+                <Td label="Assigned nurse">
                   {shift.claimedBy ? (
-                    <span className="mono">{shift.claimedBy}</span>
+                    <CellStack
+                      primary={lookup.name(shift.claimedBy)}
+                      secondary={
+                        shift.timesheetStatus
+                          ? `Timesheet ${shift.timesheetStatus}`
+                          : undefined
+                      }
+                    />
                   ) : (
                     <span className="muted">—</span>
                   )}
-                  {shift.timesheetStatus ? (
-                    <span className="cell-note nowrap">
-                      Timesheet {shift.timesheetStatus}
-                    </span>
-                  ) : null}
-                </td>
-                <td>
-                  <CancellationHistory shift={shift} />
-                </td>
-                <td className="cell-actions">
+                </Td>
+                <Td label="Status">
+                  <span className={styles.status}>
+                    <StatusBadge
+                      kind="shift"
+                      status={shift.status}
+                      testId={TEST_IDS.adminShiftStatusBadge}
+                    />
+                    {history ? (
+                      <span className={styles.history}>{history}</span>
+                    ) : null}
+                  </span>
+                </Td>
+                <Td end>
                   {shift.status === "filled" && shift.claimedBy ? (
                     <ShiftCancelControl
                       shiftId={shift.id}
                       shiftLabel={shiftLabel(shift)}
                       options={STAFF_CANCEL_OPTIONS}
-                      onCancelled={onChanged}
+                      onCancelled={onCancelled}
                     />
                   ) : null}
-                </td>
+                </Td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </TableScroll>
+            );
+          })
+        )}
+      </tbody>
+    </Table>
   );
 }
 
-function AuditDetails({ details }: { details: AuditLogEntry["details"] }) {
-  const entries = Object.entries(details);
-  if (entries.length === 0) return <span className="muted">—</span>;
+function ActivityTable({
+  entries,
+  lookup,
+}: {
+  entries: AuditLogEntry[];
+  lookup: Lookup;
+}) {
   return (
-    <span className="details">
-      {entries.map(([key, value]) => (
-        <span key={key} className="detail">
-          <span className="muted">{key}</span> {String(value)}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
-  return (
-    <TableScroll label="Audit log table">
-      <table className="data-table" data-testid={TEST_IDS.auditLogTable}>
-        <thead>
-          <tr>
-            <th scope="col">When</th>
-            <th scope="col">Action</th>
-            <th scope="col">Actor</th>
-            <th scope="col">Entity</th>
-            <th scope="col">Details</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.length === 0 ? (
-            <tr>
-              <td className="empty-row" colSpan={5}>
-                No activity yet.
-              </td>
-            </tr>
-          ) : (
-            entries.map((entry) => (
+    <Table label="Recent activity" testId={TEST_IDS.auditLogTable}>
+      <thead>
+        <tr>
+          <Th>Activity</Th>
+          <Th>What happened</Th>
+          <Th end>When</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {entries.length === 0 ? (
+          <EmptyRow colSpan={3}>No activity yet.</EmptyRow>
+        ) : (
+          entries.map((entry) => {
+            const line = describeActivity(entry, lookup);
+            return (
               <tr key={entry.id}>
-                <td className="nums">
-                  <time dateTime={entry.at}>{formatDateTime(entry.at)}</time>
-                </td>
-                <td>{AUDIT_ACTION_LABEL[entry.action]}</td>
-                <td>
-                  <span className="mono">{entry.actorId}</span>
-                  <span className="cell-note">{entry.actorRole}</span>
-                </td>
-                <td>
-                  <span className="mono">{entry.entityId ?? "—"}</span>
-                  <span className="cell-note">{entry.entityType}</span>
-                </td>
-                <td>
-                  <AuditDetails details={entry.details} />
-                </td>
+                <Td label="Activity">
+                  <strong className="nowrap">{line.title}</strong>
+                </Td>
+                <Td label="What happened">{line.sentence}</Td>
+                <Td label="When" end className="muted nowrap">
+                  <RelativeTime dateTime={entry.at} />
+                </Td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </TableScroll>
+            );
+          })
+        )}
+      </tbody>
+    </Table>
   );
 }
 
-function OutboxList({ messages }: { messages: OutboxMessage[] }) {
-  if (messages.length === 0) {
-    return <p className="section-state muted">No notifications yet.</p>;
-  }
+function OutboxList({
+  messages,
+  lookup,
+}: {
+  messages: OutboxMessage[];
+  lookup: Lookup;
+}) {
   return (
-    <ol className="outbox" aria-label="Notifications, newest first">
+    <ListPanel label="Notifications, newest first">
       {messages.map((message) => (
-        <li key={message.id} className="outbox-item">
-          <div className="outbox-head">
+        <li key={message.id} className={styles.message}>
+          <div className={styles.messageHead}>
             <strong>{message.subject}</strong>
-            <time className="muted small nums" dateTime={message.createdAt}>
-              {formatDateTime(message.createdAt)}
-            </time>
+            <RelativeTime
+              dateTime={message.createdAt}
+              className={styles.messageTime}
+            />
           </div>
-          <p className="small muted">
-            To <span className="mono">{message.recipientId}</span> (
-            {message.recipientEmail}) ·{" "}
-            <span className="mono">{message.shiftId}</span>
+          <p className={styles.messageTo}>
+            To {lookup.name(message.recipientId)}{" "}
+            <IdText>{message.recipientEmail}</IdText>
           </p>
-          <p className="outbox-body">{message.body}</p>
+          <p className={styles.messageBody}>{message.body}</p>
         </li>
       ))}
-    </ol>
+    </ListPanel>
   );
 }
 
+/**
+ * The admin's dashboard: coverage KPIs and every shift, recent activity, the outbox and
+ * timesheets, live. Reset demo data is the one action that asks first, in an in-app dialog.
+ */
 export function AdminView() {
   const api = useApi();
   const { run, pending } = useAction();
@@ -250,6 +254,12 @@ export function AdminView() {
   const timesheets = useResource(
     useCallback(() => api.listTimesheets(), [api]),
   );
+  const [tab, setTab] = useState<CoverageTab>("all");
+  const [agency, setAgency] = useState(ALL_AGENCIES);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [allActivity, setAllActivity] = useState(false);
+  const [allMessages, setAllMessages] = useState(false);
+  const agencySelectId = useId();
 
   function reloadAll() {
     shifts.reload();
@@ -262,12 +272,10 @@ export function AdminView() {
 
   async function reset() {
     if (pending) return;
-    if (!window.confirm(RESET_CONFIRM_MESSAGE)) return;
-    const done = await run(
-      "reset",
-      () => api.resetDemoData(),
-      SUCCESS_MESSAGES.demoDataReset,
-    );
+    const done = await run("reset", () => api.resetDemoData(), {
+      success: SUCCESS_MESSAGES.demoDataReset,
+    });
+    setConfirmReset(false);
     if (done) reloadAll();
   }
 
@@ -279,143 +287,311 @@ export function AdminView() {
         const { blob, fileName } = await api.exportLicenses();
         saveBlob(blob, fileName);
       },
-      SUCCESS_MESSAGES.licensesExported,
+      { success: SUCCESS_MESSAGES.licensesExported },
     );
     // The export is in the audit log now.
     if (done) audit.reload();
   }
 
+  function applyCancel(result: CancelShiftResponse) {
+    shifts.mutate((data): AdminShiftListResponse => ({
+      ...data,
+      shifts: replaceShift(data.shifts, result, (previous, next) => ({
+        ...previous,
+        ...next,
+        timesheetStatus: null,
+      })),
+    }));
+    // The cancellation's history and audit entry come with the next poll; ask now.
+    audit.reload();
+    outbox.reload();
+  }
+
   const allShifts = [...(shifts.data?.shifts ?? [])].sort(byDateAndTime);
-  const openCount = allShifts.filter((shift) => shift.status === "open").length;
-  const filledCount = allShifts.filter(
-    (shift) => shift.status === "filled",
+  const agencies = [
+    ...new Map(allShifts.map((shift) => [shift.agencyId, shift.agencyName])),
+  ].sort((a, b) => a[1].localeCompare(b[1]));
+  // Counts follow the agency filter, so the tabs and KPIs describe what is shown.
+  const scoped =
+    agency === ALL_AGENCIES
+      ? allShifts
+      : allShifts.filter((shift) => shift.agencyId === agency);
+  const openShifts = scoped.filter((shift) => shift.status === "open");
+  const filledShifts = scoped.filter((shift) => shift.status === "filled");
+  const visible =
+    tab === "open" ? openShifts : tab === "filled" ? filledShifts : scoped;
+  const cancellations = scoped.flatMap((shift) => shift.cancellations);
+  const noShows = cancellations.filter(
+    (record) => record.reason === "no-show",
   ).length;
-  const cancellationCount = allShifts.reduce(
-    (sum, shift) => sum + shift.cancellations.length,
-    0,
-  );
+  const covered = openShifts.length + filledShifts.length;
+  const coverage =
+    covered === 0 ? null : Math.round((filledShifts.length / covered) * 100);
+  const allTimesheets = timesheets.data?.timesheets ?? [];
+  const pendingTimesheets = allTimesheets.filter(
+    (entry) => entry.status === "submitted",
+  ).length;
+
+  const lookup = createLookup({
+    refs: {
+      people: {
+        ...timesheets.data?.refs.people,
+        ...outbox.data?.refs.people,
+        ...audit.data?.refs.people,
+        ...shifts.data?.refs.people,
+      },
+      shifts: {
+        ...timesheets.data?.refs.shifts,
+        ...outbox.data?.refs.shifts,
+        ...audit.data?.refs.shifts,
+        ...shifts.data?.refs.shifts,
+      },
+    },
+    shifts: allShifts,
+  });
+
+  const entries = audit.data?.entries ?? [];
+  const shownEntries = allActivity
+    ? entries
+    : entries.slice(0, RECENT_ACTIVITY);
+  const messages = outbox.data?.messages ?? [];
+  const shownMessages = allMessages
+    ? messages
+    : messages.slice(0, RECENT_MESSAGES);
   const seconds = POLL_INTERVAL_MS / 1000;
 
   return (
-    <>
+    <PageStack>
       <PageHeader
-        title="Operations dashboard"
-        description={
-          <span className="live">
+        title="Shift coverage"
+        meta={
+          <span className={styles.live}>
             <span
-              className="live-dot"
+              className={styles.liveDot}
               data-paused={paused || undefined}
               aria-hidden="true"
             />
             {paused
               ? "Live updates paused while this tab is hidden"
-              : `Live, refreshes every ${seconds} seconds`}
-            {shifts.updatedAt
-              ? ` · updated ${formatClockTime(shifts.updatedAt)}`
-              : ""}
+              : `Live, refreshes every ${seconds} s`}
+            {shifts.updatedAt ? (
+              <span>
+                · updated{" "}
+                <RelativeTime dateTime={shifts.updatedAt.toISOString()} />
+              </span>
+            ) : null}
           </span>
         }
         actions={
           <>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              aria-disabled={pending === "export" || undefined}
+            <Button
+              variant="secondary"
+              icon={<DownloadIcon size={18} />}
+              busy={pending === "export"}
+              aria-label="Export license documents"
               onClick={() => void exportLicenses()}
             >
-              {pending === "export" ? "Exporting…" : "Export license documents"}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              aria-disabled={pending === "reset" || undefined}
-              onClick={() => void reset()}
+              {pending === "export" ? (
+                "Exporting…"
+              ) : (
+                <span>
+                  Export<span className={styles.long}> license documents</span>
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              icon={<ResetIcon size={18} />}
+              aria-label="Reset demo data"
+              onClick={() => setConfirmReset(true)}
             >
-              {pending === "reset" ? "Resetting…" : "Reset demo data"}
-            </button>
+              <span>
+                Reset<span className={styles.long}> demo data</span>
+              </span>
+            </Button>
           </>
         }
       />
 
-      <dl className="stats" aria-label="Coverage summary">
-        <div className="stat">
-          <dt>Shifts</dt>
-          <dd>{allShifts.length}</dd>
-        </div>
-        <div className="stat">
-          <dt>Open</dt>
-          <dd>{openCount}</dd>
-        </div>
-        <div className="stat">
-          <dt>Filled</dt>
-          <dd>{filledCount}</dd>
-        </div>
-        <div className="stat">
-          <dt>Cancellations</dt>
-          <dd>{cancellationCount}</dd>
-        </div>
-      </dl>
+      <Panel id="coverage">
+        <div className={styles.coverage}>
+          {shifts.loading ? (
+            <KpiSkeleton count={5} />
+          ) : (
+            <KpiGrid label="Coverage summary">
+              <Kpi
+                label="Needs coverage"
+                value={openShifts.length}
+                tone="warning"
+              />
+              <Kpi label="Filled" value={filledShifts.length} tone="success" />
+              <Kpi
+                label="Coverage rate"
+                value={coverage === null ? "—" : `${coverage}%`}
+                detail={`${filledShifts.length} of ${covered} shifts filled`}
+              />
+              <Kpi
+                label="Cancellations"
+                value={cancellations.length}
+                tone="danger"
+                detail={`${noShows} ${noShows === 1 ? "was a no-show" : "were no-shows"}`}
+              />
+              <Kpi
+                label="Timesheets pending"
+                value={pendingTimesheets}
+                tone="warning"
+                detail="Awaiting approval"
+              />
+            </KpiGrid>
+          )}
 
-      <Section
-        title="Shift coverage"
-        description="Every shift across agencies, who covers it and its cancellation history."
-      >
-        <SectionState
-          loading={shifts.loading}
-          error={shifts.error}
-          empty={false}
-          emptyText=""
-        >
-          <AdminShiftTable shifts={allShifts} onChanged={reloadAll} />
-        </SectionState>
-      </Section>
-
-      <div className="layout-split layout-split-wide">
-        <Section
-          title="Audit log"
-          description="Every state change, newest first."
-        >
-          <SectionState
-            loading={audit.loading}
-            error={audit.error}
-            empty={false}
-            emptyText=""
+          <section
+            id="coverage"
+            className={styles.block}
+            aria-label="Coverage by status"
           >
-            <AuditLogTable entries={audit.data?.entries ?? []} />
-          </SectionState>
+            <div className={styles.toolbar}>
+              <Tabs<CoverageTab>
+                label="Filter shifts by coverage"
+                idBase="admin-coverage"
+                value={tab}
+                onChange={setTab}
+                items={[
+                  {
+                    id: "open",
+                    label: "Needs coverage",
+                    count: openShifts.length,
+                  },
+                  { id: "filled", label: "Filled", count: filledShifts.length },
+                  { id: "all", label: "All shifts", count: scoped.length },
+                ]}
+              />
+              <label htmlFor={agencySelectId} className="visually-hidden">
+                Agency
+              </label>
+              <Select
+                id={agencySelectId}
+                className={styles.agency}
+                value={agency}
+                onChange={(event) => setAgency(event.target.value)}
+              >
+                <option value={ALL_AGENCIES}>All agencies</option>
+                {agencies.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div {...tabPanelProps("admin-coverage", tab)}>
+              {shifts.error ? (
+                <LoadError message={shifts.error} onRetry={shifts.reload} />
+              ) : null}
+              {shifts.loading ? (
+                <TableSkeleton label="shifts" rows={3} columns={7} />
+              ) : (
+                <CoverageTable
+                  shifts={visible}
+                  lookup={lookup}
+                  onCancelled={applyCancel}
+                />
+              )}
+            </div>
+          </section>
+        </div>
+      </Panel>
+
+      <Panel id="activity">
+        <Section
+          id="activity"
+          title="Recent activity"
+          actions={
+            entries.length > RECENT_ACTIVITY ? (
+              <Button
+                variant="quiet"
+                size="sm"
+                aria-expanded={allActivity}
+                onClick={() => setAllActivity((value) => !value)}
+              >
+                {allActivity ? "Show recent" : `Show all ${entries.length}`}
+              </Button>
+            ) : null
+          }
+        >
+          {audit.error ? (
+            <LoadError message={audit.error} onRetry={audit.reload} />
+          ) : null}
+          {audit.loading ? (
+            <TableSkeleton label="recent activity" rows={3} columns={3} />
+          ) : (
+            <ActivityTable entries={shownEntries} lookup={lookup} />
+          )}
         </Section>
 
         <Section
-          title="Notification outbox"
-          description="Claim and cancellation emails, held here instead of being sent."
+          id="outbox"
+          title="Outbox"
+          count={outbox.loading ? undefined : messages.length}
+          actions={
+            messages.length > RECENT_MESSAGES ? (
+              <Button
+                variant="quiet"
+                size="sm"
+                aria-expanded={allMessages}
+                onClick={() => setAllMessages((value) => !value)}
+              >
+                {allMessages ? "Show recent" : `Show all ${messages.length}`}
+              </Button>
+            ) : null
+          }
         >
-          <SectionState
-            loading={outbox.loading}
-            error={outbox.error}
-            empty={false}
-            emptyText=""
-          >
-            <OutboxList messages={outbox.data?.messages ?? []} />
-          </SectionState>
+          {outbox.error ? (
+            <LoadError message={outbox.error} onRetry={outbox.reload} />
+          ) : null}
+          {outbox.loading ? (
+            <ListSkeleton label="notifications" rows={2} action={false} />
+          ) : messages.length === 0 ? (
+            <EmptyState>
+              No notifications yet. Claim and cancellation emails are held here
+              instead of being sent.
+            </EmptyState>
+          ) : (
+            <OutboxList messages={shownMessages} lookup={lookup} />
+          )}
         </Section>
-      </div>
+      </Panel>
 
-      <Section
-        title="Timesheets"
-        description="All submitted and approved hours."
-      >
-        <SectionState
-          loading={timesheets.loading}
-          error={timesheets.error}
-          empty={false}
-          emptyText=""
+      <Panel id="timesheets">
+        <Section
+          id="timesheets"
+          title="Timesheets"
+          count={timesheets.loading ? undefined : allTimesheets.length}
         >
-          <TimesheetTable
-            timesheets={timesheets.data?.timesheets ?? []}
-            showAgency
-          />
-        </SectionState>
-      </Section>
-    </>
+          {timesheets.error ? (
+            <LoadError message={timesheets.error} onRetry={timesheets.reload} />
+          ) : null}
+          {timesheets.loading ? (
+            <TableSkeleton label="timesheets" rows={2} columns={7} />
+          ) : (
+            <TimesheetTable
+              timesheets={allTimesheets}
+              lookup={lookup}
+              showAgency
+            />
+          )}
+        </Section>
+      </Panel>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset demo data?"
+        confirmLabel={pending === "reset" ? "Resetting…" : "Reset demo data"}
+        busy={pending === "reset"}
+        onConfirm={() => void reset()}
+        onCancel={() => setConfirmReset(false)}
+      >
+        {RESET_CONFIRM_MESSAGE}
+      </ConfirmDialog>
+    </PageStack>
   );
 }

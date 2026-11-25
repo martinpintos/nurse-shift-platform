@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { LOGIN_PATH, ROLE_HOME } from "../lib/roles";
 import { useSession, type SessionState } from "../lib/session";
-import { AppShell } from "./AppShell";
+import { AppShell } from "./shell/AppShell";
 import { SessionError, SessionLoading } from "./FullPageMessage";
 
 /** Where a page for `role` should send this session, or null to stay. */

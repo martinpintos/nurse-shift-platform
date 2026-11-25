@@ -1,18 +1,43 @@
 import type { Shift } from "@repo/shared";
 import {
+  formatDay,
+  formatHours,
   formatShiftDate,
-  formatTimeRange,
   isOvernight,
+  shiftEndDate,
   shiftLength,
 } from "../lib/format";
 
-export function shiftStatusTone(status: Shift["status"]) {
-  if (status === "open") return "accent" as const;
-  if (status === "filled") return "success" as const;
-  return "danger" as const;
+/** The plain shift from an action's response (the cancel response adds `cancellation`). */
+export function toShift(shift: Shift): Shift {
+  return {
+    id: shift.id,
+    agencyId: shift.agencyId,
+    agencyName: shift.agencyName,
+    role: shift.role,
+    date: shift.date,
+    startTime: shift.startTime,
+    endTime: shift.endTime,
+    status: shift.status,
+    claimedBy: shift.claimedBy,
+  };
 }
 
-export function byDateAndTime(a: Shift, b: Shift): number {
+/** Replaces one shift in a list with the version an action returned. */
+export function replaceShift<T extends Shift>(
+  shifts: readonly T[],
+  updated: Shift,
+  merge: (previous: T, next: Shift) => T = (_previous, next) => next as T,
+): T[] {
+  return shifts.map((shift) =>
+    shift.id === updated.id ? merge(shift, toShift(updated)) : shift,
+  );
+}
+
+export function byDateAndTime(
+  a: Pick<Shift, "date" | "startTime">,
+  b: Pick<Shift, "date" | "startTime">,
+): number {
   return a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime);
 }
 
@@ -21,19 +46,27 @@ export function shiftLabel(shift: Shift): string {
   return `${shift.role} shift ${shift.id} on ${formatShiftDate(shift.date)}`;
 }
 
-/** Date, time range and length of a shift, as used on cards and rows. */
-export function ShiftWhen({ shift }: { shift: Shift }) {
+/** "Ends Sat, Oct 3" for an overnight shift, "12 h" for a day shift. */
+export function shiftEndNote(
+  shift: Pick<Shift, "date" | "startTime" | "endTime">,
+): string {
+  return isOvernight(shift.startTime, shift.endTime)
+    ? `Ends ${formatDay(shiftEndDate(shift.date, shift.startTime, shift.endTime))}`
+    : shiftLength(shift.startTime, shift.endTime);
+}
+
+/** "19:00–07:00 +1" with the length for screen readers and on hover. */
+export function ShiftHours({
+  shift,
+}: {
+  shift: Pick<Shift, "startTime" | "endTime">;
+}) {
   return (
-    <div className="shift-when">
-      <span className="shift-date">{formatShiftDate(shift.date)}</span>
-      <span className="shift-time nums">
-        {formatTimeRange(shift.startTime, shift.endTime)}
-        <span className="muted">
-          {" · "}
-          {shiftLength(shift.startTime, shift.endTime)}
-          {isOvernight(shift.startTime, shift.endTime) ? " · overnight" : ""}
-        </span>
-      </span>
-    </div>
+    <span
+      className="nums nowrap"
+      title={shiftLength(shift.startTime, shift.endTime)}
+    >
+      {formatHours(shift.startTime, shift.endTime)}
+    </span>
   );
 }

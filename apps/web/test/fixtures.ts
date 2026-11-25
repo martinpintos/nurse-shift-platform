@@ -4,6 +4,7 @@ import type {
   Credential,
   MeResponse,
   OutboxMessage,
+  Refs,
   Shift,
   Timesheet,
 } from "@repo/shared";
@@ -137,4 +138,28 @@ export const outboxMessage: OutboxMessage = {
   recipientEmail: "james.cook@example.com",
   subject: "Your shift was cancelled",
   body: "Your RN shift on 2026-10-02 was released.",
+};
+
+/** Names for the seed ids, as the API's `refs` side map returns them. */
+export const refs: Refs = {
+  people: {
+    "nurse-1": { name: "Maria Lopez", role: "nurse" },
+    "nurse-2": { name: "James Cook", role: "nurse" },
+    "agency-a": { name: "Sunrise Health Staffing", role: "agency" },
+    "agency-b": { name: "Metro Care Partners", role: "agency" },
+    "admin-1": { name: "Alex Kim", role: "admin" },
+  },
+  shifts: Object.fromEntries(
+    seedShifts.map((shift) => [
+      shift.id,
+      {
+        agencyId: shift.agencyId,
+        agencyName: shift.agencyName,
+        role: shift.role,
+        date: shift.date,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+      },
+    ]),
+  ),
 };

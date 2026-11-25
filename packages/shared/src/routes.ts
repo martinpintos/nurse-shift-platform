@@ -47,6 +47,12 @@ export const ROUTES = [
   // Beyond the spec
   { method: "GET", path: "/api/health", access: "public", spec: false },
   { method: "GET", path: "/api/auth/me", access: ANY_ROLE, spec: false },
+  {
+    method: "GET",
+    path: "/api/agencies/:agencyId/people",
+    access: ["agency", "admin"],
+    spec: false,
+  },
   { method: "POST", path: "/api/credentials", access: ["nurse"], spec: false },
   {
     method: "GET",

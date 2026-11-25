@@ -112,15 +112,19 @@
   --z-toast: 60;
 
   /* Layout */
-  --sidebar-width: 240px;
+  --sidebar-width: 220px;
+  --sidebar-rail-width: 68px;
   /* Brand plus up to five nav items: the toast never rises into this band. */
   --sidebar-nav-reserve: 320px;
   --sidebar-user-card-height: 72px;
   --topbar-height: 56px;
   --bottom-tabs-height: 64px;
   --drawer-width: 400px;
-  --content-max: 1200px;
-  --gutter: var(--space-8);
+  --content-max: 1240px;
+  --gutter: var(--space-10);
+  /* Between the blocks of a page, and between a block's heading and its content. */
+  --section-gap: var(--space-10);
+  --block-gap: var(--space-4);
   --control-height: 40px;
   --control-height-sm: 32px;
 
@@ -133,5 +137,6 @@
 @media (max-width: 959.98px) {
   :root {
     --gutter: var(--space-4);
+    --section-gap: var(--space-8);
   }
 }

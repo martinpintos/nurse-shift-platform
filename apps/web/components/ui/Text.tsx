@@ -1,9 +1,16 @@
 import type { ReactNode } from "react";
 import styles from "./Text.module.css";
 
-/** An id or other secondary detail: small, monospace, quiet. */
+/**
+ * An id or other secondary detail: small, monospace, quiet. A trailing space keeps the
+ * id a separate word in the row's text ("shift-1 19:00", never "shift-119:00").
+ */
 export function IdText({ children }: { children: ReactNode }) {
-  return <span className={styles.id}>{children}</span>;
+  return (
+    <>
+      <span className={styles.id}>{children}</span>{" "}
+    </>
+  );
 }
 
 /** Initials in a circle, for the signed-in user. Decorative. */

@@ -68,6 +68,11 @@ export function Section({
   );
 }
 
+/** The page's blocks, one under another with the section gap between them. */
+export function PageStack({ children }: { children: ReactNode }) {
+  return <div className={styles.stack}>{children}</div>;
+}
+
 /** Nothing to show yet: a short sentence, optionally an action. */
 export function EmptyState({
   children,

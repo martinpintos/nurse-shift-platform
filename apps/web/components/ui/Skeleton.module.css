@@ -1,30 +1,20 @@
+/* Flat grey blocks at the size of what they stand in for; a slow pulse, no shimmer. */
 .skeleton {
   display: block;
   max-width: 100%;
   border-radius: var(--radius-sm);
-  background: linear-gradient(
-      90deg,
-      transparent 0,
-      rgb(255 255 255 / 0.6) 50%,
-      transparent 100%
-    )
-    var(--color-surface-sunken);
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
+  background: var(--color-surface-sunken);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .skeleton {
-    animation: shimmer 1.4s ease-in-out infinite;
+    animation: pulse 1.6s ease-in-out infinite;
   }
 }
 
-@keyframes shimmer {
-  from {
-    background-position: 150% 0;
-  }
-  to {
-    background-position: -50% 0;
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
   }
 }
 

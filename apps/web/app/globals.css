@@ -135,11 +135,6 @@ a {
   font-size: var(--font-size-sm);
 }
 
-.mono {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-}
-
 .nums {
   font-variant-numeric: tabular-nums;
 }

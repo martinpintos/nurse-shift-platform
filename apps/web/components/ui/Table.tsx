@@ -39,13 +39,14 @@ export function Table({
   );
 }
 
+/** A column header. `end` right-aligns it, over a column of figures. */
 export function Th({
-  align,
+  end = false,
   children,
   ...props
-}: ThHTMLAttributes<HTMLTableCellElement> & { align?: "end" }) {
+}: ThHTMLAttributes<HTMLTableCellElement> & { end?: boolean }) {
   return (
-    <th scope="col" data-align={align} {...props}>
+    <th scope="col" data-align={end ? "end" : undefined} {...props}>
       {children}
     </th>
   );
@@ -54,15 +55,15 @@ export function Th({
 /** A cell. `label` is shown before the value when rows stack into cards on phones. */
 export function Td({
   label,
-  align,
+  end = false,
   children,
   ...props
 }: TdHTMLAttributes<HTMLTableCellElement> & {
   label?: string;
-  align?: "end";
+  end?: boolean;
 }) {
   return (
-    <td data-label={label} data-align={align} {...props}>
+    <td data-label={label} data-align={end ? "end" : undefined} {...props}>
       {children}
     </td>
   );
@@ -94,7 +95,10 @@ export function CellStack({
   return (
     <span className={styles.cellStack}>
       <span>{primary}</span>
-      {secondary ? <span className={styles.secondary}>{secondary}</span> : null}
+      {secondary ? (
+        // The trailing space keeps an id a separate word in the row's text.
+        <span className={styles.secondary}>{secondary} </span>
+      ) : null}
     </span>
   );
 }

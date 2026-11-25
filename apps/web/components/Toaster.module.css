@@ -106,6 +106,18 @@
   }
 }
 
+/*
+ * Desktop with the sidebar collapsed to a rail: the rail is too narrow to hold it, so it
+ * sits beside the rail at the bottom left.
+ */
+@media (min-width: 960px) {
+  :global(:root[data-shell="rail"]) .region {
+    bottom: var(--space-4);
+    left: calc(var(--sidebar-rail-width) + var(--space-4));
+    width: 340px;
+  }
+}
+
 /* Phones and tablets with the shell: just under the top bar. */
 @media (max-width: 959.98px) {
   :global(:root[data-shell]) .region {

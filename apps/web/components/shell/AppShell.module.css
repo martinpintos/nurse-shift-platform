@@ -15,8 +15,36 @@
 .brandRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   height: 72px;
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-3) 0 var(--space-5);
+}
+
+.brandRow :global(svg) {
+  flex: none;
+}
+
+.collapse {
+  display: inline-grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-shell-muted);
+}
+
+.collapse:hover {
+  background: var(--color-shell-raised);
+  color: var(--color-shell-text);
+}
+
+.railMark {
+  display: inline-flex;
+  color: var(--color-shell-text);
 }
 
 .nav {
@@ -35,11 +63,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 44px;
+  min-height: 42px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
   color: var(--color-shell-muted);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
   text-decoration: none;
   transition:
     background-color var(--motion-fast) ease,
@@ -120,7 +150,67 @@
   min-height: 100vh;
   min-height: 100dvh;
   margin-left: var(--sidebar-width);
-  transition: margin-right var(--motion-medium) var(--ease-out);
+  transition:
+    margin-left var(--motion-medium) var(--ease-out),
+    margin-right var(--motion-medium) var(--ease-out);
+}
+
+/* Collapsed: a 68px icon rail. Labels stay in the DOM for screen readers. */
+.sidebar[data-collapsed] {
+  width: var(--sidebar-rail-width);
+}
+
+.sidebar[data-collapsed] .brandRow {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  height: auto;
+  padding: var(--space-5) 0 var(--space-3);
+}
+
+.sidebar[data-collapsed] .nav {
+  padding: var(--space-2);
+}
+
+.sidebar[data-collapsed] .navLink {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar[data-collapsed] .navLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sidebar[data-collapsed] .navLink[aria-current]::before {
+  left: calc(var(--space-2) * -1);
+}
+
+.sidebar[data-collapsed] .userCard {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  height: auto;
+  margin: 0 var(--space-2);
+  padding: var(--space-3) 0;
+}
+
+.sidebar[data-collapsed] .userText {
+  display: none;
+}
+
+.main[data-collapsed] {
+  margin-left: var(--sidebar-rail-width);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main {
+    transition: none;
+  }
 }
 
 /* A drawer is open: make room for it instead of covering the table. */
@@ -133,9 +223,9 @@
 }
 
 .content {
-  max-width: var(--content-max);
+  max-width: calc(var(--content-max) + 2 * var(--gutter));
   margin: 0 auto;
-  padding: var(--space-8) var(--gutter) var(--space-12);
+  padding: var(--space-8) var(--gutter) var(--space-16, 64px);
 }
 
 .topBar,
@@ -162,7 +252,8 @@
     color: var(--color-shell-text);
   }
 
-  .main {
+  .main,
+  .main[data-collapsed] {
     margin-left: 0;
     padding-bottom: calc(
       var(--bottom-tabs-height) + env(safe-area-inset-bottom)

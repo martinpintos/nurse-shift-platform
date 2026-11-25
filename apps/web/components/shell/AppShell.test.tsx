@@ -31,9 +31,9 @@ describe("AppShell", () => {
     const links = within(sidebar!).getAllByRole("link");
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
       "#coverage",
-      "#timesheets",
       "#activity",
       "#outbox",
+      "#timesheets",
     ]);
   });
 
@@ -50,7 +50,7 @@ describe("AppShell", () => {
       within(tabs!)
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["Shift coverage", "Timesheets", "Activity"]);
+    ).toEqual(["Shift coverage", "Activity", "Timesheets"]);
   });
 
   it("marks only the active tab's panels active, and switches on tap", async () => {
@@ -76,6 +76,41 @@ describe("AppShell", () => {
         .getByRole("button", { name: "License" })
         .getAttribute("aria-current"),
     ).toBe("page");
+  });
+
+  it("collapses the sidebar to a rail and remembers it in this browser", async () => {
+    const view = renderApp(
+      <RequireRole role="nurse">
+        <p>Nurse page</p>
+      </RequireRole>,
+      { user: nurse },
+    );
+    await screen.findByText("Nurse page");
+    const toggle = screen.getByRole("button", { name: "Collapse sidebar" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(document.documentElement.getAttribute("data-shell")).toBe("sidebar");
+
+    fireEvent.click(toggle);
+    expect(
+      screen
+        .getByRole("button", { name: "Expand sidebar" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(document.documentElement.getAttribute("data-shell")).toBe("rail");
+    // Labels stay in the DOM for screen readers; Sign out stays reachable.
+    expect(screen.getAllByRole("link", { name: "License" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+
+    view.unmount();
+    renderApp(
+      <RequireRole role="nurse">
+        <p>Nurse page</p>
+      </RequireRole>,
+      { user: nurse },
+    );
+    await screen.findByText("Nurse page");
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeTruthy();
+    window.localStorage.clear();
   });
 
   it("sets the shell marker the toast docks against, and removes it on unmount", async () => {

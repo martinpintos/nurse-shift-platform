@@ -1,3 +1,4 @@
+/* One bordered panel per table, a pale header band as in docs/design, 1px row rules. */
 .scroll {
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -13,12 +14,13 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-size: var(--font-size-md);
   font-variant-numeric: tabular-nums;
 }
 
 .table th {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  height: 48px;
+  padding: 0 var(--space-5);
   background: var(--color-surface-muted);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -28,17 +30,10 @@
 }
 
 .table td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  height: 60px;
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-border);
   vertical-align: middle;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.table tbody tr:hover td {
-  background: color-mix(in srgb, var(--color-surface-muted) 55%, transparent);
 }
 
 .table [data-align="end"] {
@@ -46,7 +41,8 @@
 }
 
 .emptyRow td {
-  padding: var(--space-8) var(--space-4);
+  height: auto;
+  padding: var(--space-8) var(--space-5);
   color: var(--color-text-muted);
   text-align: center;
 }
@@ -57,9 +53,27 @@
 }
 
 .secondary {
-  color: var(--color-text-subtle);
-  font-family: var(--font-mono);
+  color: var(--color-text-muted);
   font-size: var(--font-size-xs);
+}
+
+/* Laptops (beside a 220px sidebar): tighter cells so wide tables keep one line per value. */
+@media (max-width: 1439.98px) {
+  .table th,
+  .table td {
+    padding-right: var(--space-3);
+    padding-left: var(--space-3);
+  }
+
+  .table th:first-child,
+  .table td:first-child {
+    padding-left: var(--space-5);
+  }
+
+  .table th:last-child,
+  .table td:last-child {
+    padding-right: var(--space-5);
+  }
 }
 
 /* Phones and tablets: each row becomes a labeled card. */
@@ -67,6 +81,7 @@
   .scroll:has(.stack) {
     overflow: visible;
     border: 0;
+    border-radius: 0;
     background: transparent;
   }
 
@@ -91,30 +106,38 @@
   }
 
   .stack tr {
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-4) var(--space-3);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     background: var(--color-surface);
   }
 
-  .stack tbody tr:hover td {
-    background: transparent;
-  }
-
+  /* Compact cards: the first cell (the row's identity) heads the card, the rest are
+     label and value pairs without rules, and empty cells disappear. */
   .stack td,
-  .stack tbody tr:last-child td {
+  .stack td:first-child,
+  .stack td:last-child {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--color-border);
+    height: auto;
+    min-height: 0;
+    padding: 6px 0;
+    border-top: 0;
     text-align: right;
   }
 
-  .stack td:last-child,
-  .stack tbody tr:last-child td:last-child {
-    border-bottom: 0;
+  .stack td:first-child {
+    justify-content: flex-start;
+    margin-bottom: var(--space-1);
+    padding: var(--space-2) 0 var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+  }
+
+  .stack td:empty {
+    display: none;
   }
 
   .stack td[data-label]::before {
@@ -125,11 +148,28 @@
     text-align: left;
   }
 
+  .stack td:first-child[data-label]::before {
+    content: none;
+  }
+
   .stack td:not([data-label]) {
     justify-content: flex-end;
+    padding-top: var(--space-3);
   }
 
   .stack .emptyRow td {
     justify-content: center;
+  }
+}
+
+/* Tablets: two cards per row, so the width isn't spent on label and value gaps. */
+@media (min-width: 640px) and (max-width: 959.98px) {
+  .stack tbody {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .stack .emptyRow {
+    grid-column: 1 / -1;
   }
 }

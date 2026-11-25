@@ -12,15 +12,39 @@ import {
 import { ROLE_LABEL } from "../../lib/roles";
 import { useSession } from "../../lib/session";
 import { Brand } from "../BrandMark";
-import { LogOutIcon } from "../ui/icons";
+import { BrandMark } from "../BrandMark";
+import { LogOutIcon, SidebarIcon } from "../ui/icons";
 import { Avatar } from "../ui/Text";
 import { ShellContext, type ShellValue } from "./ShellContext";
 import { ROLE_SECTIONS, panelOf, panelsOf } from "./sections";
 import { useScrollSpy } from "./use-scroll-spy";
 import styles from "./AppShell.module.css";
 
-/** Set on <html> while the shell is mounted: the toast docks in the sidebar. */
+/**
+ * Set on <html> while the shell is mounted, to "sidebar" or "rail" (collapsed): the toast
+ * docks in the sidebar above the user card, or beside the rail.
+ */
 export const SHELL_ATTRIBUTE = "data-shell";
+
+/** Remembers a collapsed sidebar per browser (a convenience; it may be unavailable). */
+const COLLAPSED_KEY = "shiftpatch.sidebar-collapsed";
+
+function readCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeCollapsed(collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    // Storage blocked (private mode): the choice lasts until reload.
+  }
+}
 
 function AccountMenu({
   user,
@@ -95,12 +119,22 @@ export function AppShell({
   const panels = panelsOf(sections);
   const [activePanel, setActivePanel] = useState<string>(panels[0]?.id ?? "");
   const currentSection = useScrollSpy(sections.map((section) => section.id));
+  // The shell renders only on the client, once the session has resolved, so the saved
+  // choice can be read up front without a hydration mismatch.
+  const [collapsed, setCollapsed] = useState(readCollapsed);
 
   useEffect(() => {
     const root = document.documentElement;
-    root.setAttribute(SHELL_ATTRIBUTE, "");
+    root.setAttribute(SHELL_ATTRIBUTE, collapsed ? "rail" : "sidebar");
     return () => root.removeAttribute(SHELL_ATTRIBUTE);
-  }, []);
+  }, [collapsed]);
+
+  function toggleSidebar() {
+    setCollapsed((value) => {
+      writeCollapsed(!value);
+      return !value;
+    });
+  }
 
   const shell = useMemo<ShellValue>(
     () => ({ activePanel, setActivePanel }),
@@ -118,9 +152,29 @@ export function AppShell({
         Skip to main content
       </a>
 
-      <aside className={styles.sidebar}>
+      <aside
+        className={styles.sidebar}
+        data-collapsed={collapsed || undefined}
+        aria-label="ShiftPatch"
+      >
         <div className={styles.brandRow}>
-          <Brand onDark />
+          {collapsed ? (
+            <span className={styles.railMark} title="ShiftPatch">
+              <BrandMark />
+            </span>
+          ) : (
+            <Brand onDark />
+          )}
+          <button
+            type="button"
+            className={styles.collapse}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={toggleSidebar}
+          >
+            <SidebarIcon size={18} />
+          </button>
         </div>
         <nav className={styles.nav} aria-label="Sections">
           <ul>
@@ -133,17 +187,21 @@ export function AppShell({
                     href={`#${section.id}`}
                     className={styles.navLink}
                     aria-current={current ? "location" : undefined}
+                    title={collapsed ? section.label : undefined}
                     onClick={() => setActivePanel(panelOf(section))}
                   >
                     <Icon size={20} />
-                    {section.label}
+                    <span className={styles.navLabel}>{section.label}</span>
                   </a>
                 </li>
               );
             })}
           </ul>
         </nav>
-        <div className={styles.userCard}>
+        <div
+          className={styles.userCard}
+          title={collapsed ? user.name : undefined}
+        >
           <Avatar name={user.name} size={36} />
           <div className={styles.userText}>
             <span className={styles.userName}>{user.name}</span>
@@ -166,7 +224,12 @@ export function AppShell({
         <AccountMenu user={user} onSignOut={logout} />
       </header>
 
-      <main id="main" className={styles.main} tabIndex={-1}>
+      <main
+        id="main"
+        className={styles.main}
+        data-collapsed={collapsed || undefined}
+        tabIndex={-1}
+      >
         <div className={styles.content}>{children}</div>
       </main>
 

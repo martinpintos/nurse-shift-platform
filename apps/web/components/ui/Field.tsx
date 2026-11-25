@@ -1,9 +1,4 @@
-import {
-  useId,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type SelectHTMLAttributes,
-} from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 import styles from "./Field.module.css";
 
 /**
@@ -49,7 +44,7 @@ export function Input({
   size = "md",
   className,
   ...props
-}: Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
+}: Omit<ComponentProps<"input">, "size"> & {
   size?: ControlSize;
 }) {
   return (
@@ -67,7 +62,7 @@ export function Select({
   className,
   children,
   ...props
-}: Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> & {
+}: Omit<ComponentProps<"select">, "size"> & {
   size?: ControlSize;
 }) {
   return (

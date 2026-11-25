@@ -177,3 +177,19 @@ test("timesheet: Maria submits her hours, Agency A approves them", async ({
     /approved/i,
   );
 });
+
+test("the admin exports license documents and the export is audited", async ({
+  page,
+}) => {
+  await signIn(page, USERS.admin, /\/admin$/);
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export license documents" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(
+    /^shiftpatch-licenses-\d{4}-\d{2}-\d{2}\.zip$/,
+  );
+  await expect(banner(page)).toContainText(SUCCESS_MESSAGES.licensesExported);
+  await expect(page.getByTestId(TEST_IDS.auditLogTable)).toContainText(
+    /exported/i,
+  );
+});

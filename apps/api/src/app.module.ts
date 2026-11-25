@@ -8,6 +8,7 @@ import { CredentialsModule } from "./credentials/credentials.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { ShiftsModule } from "./shifts/shifts.module.js";
+import { TimesheetsModule } from "./timesheets/timesheets.module.js";
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ShiftsModule } from "./shifts/shifts.module.js";
     HealthModule,
     ShiftsModule,
     CredentialsModule,
+    TimesheetsModule,
     AdminModule,
   ],
 })

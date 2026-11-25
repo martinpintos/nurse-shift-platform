@@ -1,0 +1,137 @@
+/*
+ * ShiftPatch design tokens. Light theme only (README "Decisions"); the names are
+ * semantic, so a dark theme can redefine them later without touching components.
+ *
+ * Status tones carry meaning everywhere:
+ *   warning (amber)  open, needs coverage, pending
+ *   success (green)  filled, approved, valid
+ *   danger  (red)    cancelled, no-show, expired
+ *   neutral          everything else
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces and text */
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f4f8;
+  --color-surface-sunken: #eceff4;
+  --color-border: #e3e7ee;
+  --color-border-strong: #c9d0db;
+  --color-text: #0f172a;
+  --color-text-muted: #5b6576;
+  --color-text-subtle: #7a8494;
+
+  /* Primary (blue, as in docs/design) */
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+  --color-primary-active: #1e3a8a;
+  --color-primary-soft: #e8efff;
+  --color-primary-text: #1d4ed8;
+  --color-on-primary: #ffffff;
+
+  /* Navy shell */
+  --color-shell: #0f1f3a;
+  --color-shell-raised: #1a2d4f;
+  --color-shell-active: #1f3a68;
+  --color-shell-border: #253a5e;
+  --color-shell-text: #e6ecf5;
+  --color-shell-muted: #9fb0c9;
+  --color-shell-accent: #3b82f6;
+
+  /* Status tones: soft background, text (AA on the soft background), border, dot */
+  --tone-warning-bg: #fff4e0;
+  --tone-warning-text: #8a4b00;
+  --tone-warning-border: #f6d9a8;
+  --tone-warning-dot: #d97706;
+
+  --tone-success-bg: #e7f6ec;
+  --tone-success-text: #116436;
+  --tone-success-border: #b6e2c4;
+  --tone-success-dot: #16a34a;
+
+  --tone-danger-bg: #fdecec;
+  --tone-danger-text: #a4161a;
+  --tone-danger-border: #f5c2c2;
+  --tone-danger-dot: #dc2626;
+
+  --tone-neutral-bg: #eef1f5;
+  --tone-neutral-text: #3d4656;
+  --tone-neutral-border: #d6dce5;
+  --tone-neutral-dot: #7a8494;
+
+  --tone-info-bg: #e8efff;
+  --tone-info-text: #1e40af;
+  --tone-info-border: #c3d4fb;
+  --tone-info-dot: #2563eb;
+
+  --color-danger: #c81e1e;
+  --color-danger-hover: #a51818;
+  --color-focus: #2563eb;
+
+  /* Spacing: a 4px scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Type */
+  --font-size-xs: 0.75rem; /* 12 */
+  --font-size-sm: 0.8125rem; /* 13 */
+  --font-size-md: 0.9375rem; /* 15, body */
+  --font-size-lg: 1.0625rem; /* 17, section titles */
+  --font-size-xl: 1.375rem; /* 22 */
+  --font-size-2xl: 1.75rem; /* 28, page titles */
+  --font-size-kpi: 1.875rem; /* 30 */
+  --font-weight-regular: 400;
+  --font-weight-medium: 520;
+  --font-weight-semibold: 620;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-body: 1.5;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 2px 6px rgb(15 23 42 / 0.07), 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 12px 32px rgb(15 23 42 / 0.14), 0 2px 6px rgb(15 23 42 / 0.08);
+
+  /* Layers */
+  --z-sticky: 10;
+  --z-shell: 20;
+  --z-drawer: 40;
+  --z-toast: 60;
+
+  /* Layout */
+  --sidebar-width: 240px;
+  /* Brand plus up to five nav items: the toast never rises into this band. */
+  --sidebar-nav-reserve: 320px;
+  --sidebar-user-card-height: 72px;
+  --topbar-height: 56px;
+  --bottom-tabs-height: 64px;
+  --drawer-width: 400px;
+  --content-max: 1200px;
+  --gutter: var(--space-8);
+  --control-height: 40px;
+  --control-height-sm: 32px;
+
+  --motion-fast: 120ms;
+  --motion-medium: 200ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Below the 960px breakpoint the shell switches to a top bar and bottom tabs. */
+@media (max-width: 959.98px) {
+  :root {
+    --gutter: var(--space-4);
+  }
+}

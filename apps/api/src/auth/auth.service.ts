@@ -31,12 +31,9 @@ export class AuthService {
    * email and a wrong password get the same 401 in the same time: the hasher checks a
    * dummy hash when there is no user.
    */
-  async login(
-    { email, password }: LoginRequest,
-    ip: string,
-  ): Promise<LoginResponse> {
+  async login({ email, password }: LoginRequest): Promise<LoginResponse> {
     const normalized = normalizeEmail(email);
-    if (this.throttle.isBlocked(ip, normalized)) {
+    if (this.throttle.isBlocked(normalized)) {
       throw new HttpException(
         ERROR_MESSAGES.tooManyLoginAttempts,
         HttpStatus.TOO_MANY_REQUESTS,
@@ -48,10 +45,10 @@ export class AuthService {
     });
     const valid = await this.hasher.verify(password, user?.passwordHash);
     if (!valid || !user) {
-      this.throttle.recordFailure(ip, normalized);
+      this.throttle.recordFailure(normalized);
       throw new UnauthorizedException(ERROR_MESSAGES.invalidCredentials);
     }
-    this.throttle.recordSuccess(ip, normalized);
+    this.throttle.recordSuccess(normalized);
 
     const { accessToken } = await this.tokens.issue(user.id, {
       method: "password",

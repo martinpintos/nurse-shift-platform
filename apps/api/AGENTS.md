@@ -21,15 +21,15 @@ Nest has first-party packages for what this product needs, so check them before 
 ### App
 
 - `src/main.ts` creates the app, applies `configureApp` and listens on `PORT` (3001 by default; the web app uses 3000).
-- `src/app.setup.ts` (`configureApp`) sets Express `trust proxy` to `TRUST_PROXY_HOPS`, `helmet`, the global `/api` prefix, the global `StandardSchemaValidationPipe` and the `ErrorResponseFilter`, which turns every error into `{ "error": "<message>" }`. The e2e tests call it too, so never configure the app anywhere else.
-- `src/app.module.ts` is the root module that imports the others; `AuthModule` comes first. `src/config/env.ts` validates the environment at boot (`DATABASE_URL`, `JWT_SECRET` of 32+ characters, `PORT`, `TRUST_PROXY_HOPS`; see `.env.example`) and names bad keys without their values.
+- `src/app.setup.ts` (`configureApp`) sets `helmet`, the global `/api` prefix, the global `StandardSchemaValidationPipe` and the `ErrorResponseFilter`, which turns every error into `{ "error": "<message>" }`. The e2e tests call it too, so never configure the app anywhere else.
+- `src/app.module.ts` is the root module that imports the others; `AuthModule` comes first. `src/config/env.ts` validates the environment at boot (`DATABASE_URL`, `JWT_SECRET` of 32+ characters, `PORT`; see `.env.example`) and names bad keys without their values.
 - `src/common/`: `ErrorResponseFilter` (it also maps the auth libraries' generic 401/403 bodies to `ERROR_MESSAGES`) and `Clock`, the injectable "now". Inject `Clock` wherever a decision depends on the time; tests override it.
 
 ### Auth and permissions (`src/auth/`)
 
 - `@nestjs/authentication` with a global guard: every route needs `Authorization: Bearer <jwt>`. `JwtAuthProvider` maps verified claims (`sub`, `role`, `agencyId`) to a `Principal`; no database read per request. HS256 with `JWT_SECRET`, issuer `shiftpatch-api`, audience `shiftpatch-web`, 8h, no refresh tokens.
 - `@nestjs/authorization` denies any handler without a check. Every handler declares exactly one `@Access("METHOD /api/path")`, which reads the route's access from `ROUTES` in `@repo/shared`: `@Public()` for login and health, otherwise `RolePolicy` (any other role gets 403). Ownership rules (own agency, own claim, own credential) live in the services. Get the caller with `@CurrentUser() principal: Principal`.
-- `AuthService`: login (`PasswordHasher`, scrypt, emails stored lowercased) and `me`. `LoginThrottle`: failed attempts only, in memory, per IP+email (10) and per IP (30) in a 15-minute sliding window, keyed on `req.ip`.
+- `AuthService`: login (`PasswordHasher`, scrypt, emails stored lowercased) and `me`. `LoginThrottle`: failed attempts only, in memory, per account (normalized email): 10 in a 15-minute sliding window, from any IP. Don't key it on `req.ip`: behind Vercel and Railway the API sees a different proxy address on every request.
 
 ### Features
 

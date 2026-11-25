@@ -17,119 +17,77 @@ function setup() {
   return { clock, throttle: new LoginThrottle(clock) };
 }
 
-function fail(
-  throttle: LoginThrottle,
-  times: number,
-  ip: string,
-  email: string,
-): void {
-  for (let i = 0; i < times; i++) throttle.recordFailure(ip, email);
+function fail(throttle: LoginThrottle, times: number, email: string): void {
+  for (let i = 0; i < times; i++) throttle.recordFailure(email);
 }
 
 describe("LoginThrottle", () => {
-  it("blocks an IP and email after 10 failures, not before", () => {
+  it("blocks an account after 10 failures, not before", () => {
     const { throttle } = setup();
-    fail(
-      throttle,
-      LOGIN_THROTTLE.maxPerAccount - 1,
-      "1.1.1.1",
-      "a@example.com",
-    );
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(false);
-    throttle.recordFailure("1.1.1.1", "a@example.com");
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(true);
-    expect(throttle.isBlocked("1.1.1.1", "b@example.com")).toBe(false);
-    expect(throttle.isBlocked("2.2.2.2", "a@example.com")).toBe(false);
+    fail(throttle, LOGIN_THROTTLE.maxPerAccount - 1, "a@example.com");
+    expect(throttle.isBlocked("a@example.com")).toBe(false);
+    throttle.recordFailure("a@example.com");
+    expect(throttle.isBlocked("a@example.com")).toBe(true);
+    expect(throttle.isBlocked("b@example.com")).toBe(false);
   });
 
-  it("treats emails case- and space-insensitively", () => {
+  it("treats case and surrounding spaces as the same account", () => {
     const { throttle } = setup();
-    fail(throttle, LOGIN_THROTTLE.maxPerAccount, "1.1.1.1", " A@Example.com");
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com ")).toBe(true);
+    fail(throttle, LOGIN_THROTTLE.maxPerAccount, " A@Example.com");
+    expect(throttle.isBlocked("a@example.com ")).toBe(true);
+    expect(normalizeEmail("  Maria@EXAMPLE.com ")).toBe("maria@example.com");
   });
 
-  it("blocks an IP after 30 failures across emails", () => {
-    const { throttle } = setup();
-    for (let i = 0; i < LOGIN_THROTTLE.maxPerIp - 1; i++) {
-      throttle.recordFailure("1.1.1.1", `user-${i}@example.com`);
-    }
-    expect(throttle.isBlocked("1.1.1.1", "new@example.com")).toBe(false);
-    throttle.recordFailure("1.1.1.1", "last@example.com");
-    expect(throttle.isBlocked("1.1.1.1", "new@example.com")).toBe(true);
-    expect(throttle.isBlocked("2.2.2.2", "new@example.com")).toBe(false);
-  });
-
-  it("forgets failures once they leave the 15-minute window", () => {
+  it("lets failures leave the window one by one (sliding)", () => {
     const { clock, throttle } = setup();
-    fail(throttle, LOGIN_THROTTLE.maxPerAccount, "1.1.1.1", "a@example.com");
+    throttle.recordFailure("a@example.com");
+    clock.at += 60_000;
+    fail(throttle, LOGIN_THROTTLE.maxPerAccount - 1, "a@example.com");
+    expect(throttle.isBlocked("a@example.com")).toBe(true);
+    // The first failure ages out; nine remain.
+    clock.at += LOGIN_THROTTLE.windowMs - 60_000;
+    expect(throttle.isBlocked("a@example.com")).toBe(false);
+  });
+
+  it("unblocks once the whole window has passed", () => {
+    const { clock, throttle } = setup();
+    fail(throttle, LOGIN_THROTTLE.maxPerAccount, "a@example.com");
     clock.at += LOGIN_THROTTLE.windowMs - 1;
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(true);
+    expect(throttle.isBlocked("a@example.com")).toBe(true);
     clock.at += 1;
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(false);
-    expect(throttle.size).toBe(0);
+    expect(throttle.isBlocked("a@example.com")).toBe(false);
   });
 
-  it("is a sliding window: only the failures within the last 15 minutes count", () => {
-    const { clock, throttle } = setup();
-    fail(throttle, 5, "1.1.1.1", "a@example.com");
-    clock.at += 10 * 60 * 1000;
-    fail(throttle, 5, "1.1.1.1", "a@example.com");
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(true);
-    clock.at += 5 * 60 * 1000;
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(false);
-  });
-
-  it("clears the IP+email counter on success, but not the IP's", () => {
+  it("a success clears the account's counter", () => {
     const { throttle } = setup();
-    fail(throttle, LOGIN_THROTTLE.maxPerAccount, "1.1.1.1", "a@example.com");
-    fail(
-      throttle,
-      LOGIN_THROTTLE.maxPerIp - LOGIN_THROTTLE.maxPerAccount,
-      "1.1.1.1",
-      "b@example.com",
-    );
-    throttle.recordSuccess("1.1.1.1", "a@example.com");
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(true);
-    expect(throttle.isBlocked("1.1.1.1", "c@example.com")).toBe(true);
+    fail(throttle, LOGIN_THROTTLE.maxPerAccount - 1, "a@example.com");
+    throttle.recordSuccess("a@example.com");
+    fail(throttle, LOGIN_THROTTLE.maxPerAccount - 1, "a@example.com");
+    expect(throttle.isBlocked("a@example.com")).toBe(false);
   });
 
-  it("success alone never blocks", () => {
+  it("caps a very long email so a huge body can't make a huge key", () => {
     const { throttle } = setup();
-    for (let i = 0; i < 100; i++)
-      throttle.recordSuccess("1.1.1.1", "a@example.com");
-    expect(throttle.isBlocked("1.1.1.1", "a@example.com")).toBe(false);
+    const long = `${"x".repeat(400)}@example.com`;
+    fail(throttle, LOGIN_THROTTLE.maxPerAccount, long);
+    // Same first 320 characters, same account.
+    expect(throttle.isBlocked(`${"x".repeat(400)}@other.example`)).toBe(true);
   });
 
-  it("bounds its memory, dropping the least recently failed keys first", () => {
+  it("bounds memory under a flood of distinct emails", () => {
     const { throttle } = setup();
-    fail(
-      throttle,
-      LOGIN_THROTTLE.maxPerAccount,
-      "192.0.2.1",
-      "target@example.com",
-    );
-    // Each failure from a new IP adds two keys (IP, and IP+email).
-    for (let i = 0; i < LOGIN_THROTTLE.maxKeys; i++) {
-      throttle.recordFailure(
-        `10.${i >> 16}.${(i >> 8) & 255}.${i & 255}`,
-        "a@example.com",
-      );
+    for (let i = 0; i < LOGIN_THROTTLE.maxKeys + 10; i++) {
+      throttle.recordFailure(`user-${i}@example.com`);
     }
     expect(throttle.size).toBeLessThanOrEqual(LOGIN_THROTTLE.maxKeys);
-    expect(throttle.isBlocked("192.0.2.1", "target@example.com")).toBe(false);
-    // The newest keys are kept, and their counters still work.
+    // The most recent account is still tracked.
     fail(
       throttle,
       LOGIN_THROTTLE.maxPerAccount - 1,
-      "10.0.195.79",
-      "a@example.com",
+      `user-${LOGIN_THROTTLE.maxKeys + 9}@example.com`,
     );
-    expect(throttle.isBlocked("10.0.195.79", "a@example.com")).toBe(true);
-  });
-
-  it("normalizes emails by trimming and lowercasing", () => {
-    expect(normalizeEmail("  Maria.Lopez@Example.COM ")).toBe(
-      "maria.lopez@example.com",
-    );
+    expect(
+      throttle.isBlocked(`user-${LOGIN_THROTTLE.maxKeys + 9}@example.com`),
+    ).toBe(true);
   });
 });

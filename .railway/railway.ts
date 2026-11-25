@@ -40,7 +40,12 @@ export default defineRailway(() => {
     },
     start: "pnpm --filter api start",
     healthcheck: "/api/health",
-    preDeploy: "pnpm --filter api exec prisma migrate deploy",
+    // Migrate, then make sure the spec's sample data exists. The seed only inserts
+    // missing rows, so demo activity survives deploys.
+    preDeploy: [
+      "pnpm --filter api exec prisma migrate deploy",
+      "pnpm --filter api exec prisma db seed",
+    ],
     replicas: { iad: 1 },
   });
 

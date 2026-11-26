@@ -15,9 +15,9 @@ import {
   refs,
 } from "../../test/fixtures";
 import { renderApp } from "../../test/render";
-import { tomorrowIsoDate } from "../../lib/format";
+import { toIsoDate, tomorrowIsoDate } from "../../lib/format";
 import { AgencyView } from "./AgencyView";
-import { defaultShiftRequest } from "./PostShiftForm";
+import { PAST_DATE_WARNING, defaultShiftRequest } from "./PostShiftForm";
 
 function renderAgency(routes: Record<string, RouteHandler> = {}) {
   return renderApp(
@@ -162,6 +162,37 @@ describe("AgencyView", () => {
     ).toBeNull();
     expect(opener.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(opener);
+  });
+
+  it("warns under the date when it is in the past, and still posts", async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const pastDate = toIsoDate(yesterday);
+    const { api } = renderAgency({
+      "POST /api/shifts": () =>
+        jsonResponse({ ...shift1, id: "shift-9", date: pastDate }, 201),
+    });
+    await shiftTable();
+    fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftButton));
+    const date = screen.getByLabelText("Shift date") as HTMLInputElement;
+
+    // Tomorrow (the default) and today: no warning, and no min on the input.
+    expect(screen.queryByText(PAST_DATE_WARNING)).toBeNull();
+    expect(date.hasAttribute("min")).toBe(false);
+    fireEvent.change(date, { target: { value: toIsoDate(new Date()) } });
+    expect(screen.queryByText(PAST_DATE_WARNING)).toBeNull();
+
+    fireEvent.change(date, { target: { value: pastDate } });
+    const warning = screen.getByText(PAST_DATE_WARNING);
+    expect(date.getAttribute("aria-describedby")).toBe(
+      warning.closest("p")?.id,
+    );
+
+    fireEvent.click(screen.getByTestId(TEST_IDS.agencyPostShiftSubmitButton));
+    await waitFor(() => expect(banner().textContent).toBe("Shift posted"));
+    expect(api.callsTo("POST /api/shifts")[0]?.body).toMatchObject({
+      date: pastDate,
+    });
   });
 
   it("closes the drawer with Escape or Cancel, without posting", async () => {

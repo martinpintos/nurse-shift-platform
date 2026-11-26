@@ -12,7 +12,7 @@ import { shiftEndNote } from "../../components/ShiftSummary";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { Field, Input, Select } from "../../components/ui/Field";
-import { shiftLength, tomorrowIsoDate } from "../../lib/format";
+import { shiftLength, toIsoDate, tomorrowIsoDate } from "../../lib/format";
 import { useApi } from "../../lib/session";
 import { useAction } from "../../lib/use-action";
 import styles from "./PostShiftForm.module.css";
@@ -28,6 +28,9 @@ export function defaultShiftRequest(
     endTime: "19:00",
   };
 }
+
+/** Shown under the date when it is before today. A warning only: past dates are valid. */
+export const PAST_DATE_WARNING = "This date is in the past";
 
 /**
  * The post-shift drawer. Its defaults are valid, so Post shift works untouched. On success
@@ -64,6 +67,9 @@ export function PostShiftDrawer({
     });
     if (done) onClose();
   }
+
+  // The viewer's local today, like the tomorrow default. No `min`: the API accepts past dates.
+  const pastDate = values.date !== "" && values.date < toIsoDate(new Date());
 
   const complete =
     values.date !== "" &&
@@ -110,12 +116,20 @@ export function PostShiftDrawer({
             </Select>
           )}
         </Field>
-        <Field label="Shift date">
-          {({ id }) => (
+        <Field
+          label="Shift date"
+          hint={
+            pastDate ? (
+              <span className={styles.warning}>{PAST_DATE_WARNING}</span>
+            ) : undefined
+          }
+        >
+          {({ id, hintId }) => (
             <Input
               id={id}
               type="date"
               required
+              aria-describedby={hintId}
               value={values.date}
               onChange={(event) => update("date", event.target.value)}
             />

@@ -165,6 +165,7 @@ Product and engineering decisions, recorded as they are made.
 - **Built for scripts that only know the 15 test IDs:**
   - A credential uploads automatically once a file and an expiry date are set, with an Upload button as well. Auto-upload waits for a year of 2000 or later, so typing a year doesn't fire early.
   - The post-shift form opens with valid defaults (RN, tomorrow, 07:00 to 19:00).
+  - A date before today (the viewer's local date) shows "This date is in the past" under the date field. It is a warning only: it doesn't block Post shift, and the date input has no `min`. The API keeps accepting past dates because the spec's own `POST /api/shifts` example posts 2026-10-05 and the seed shifts are in October 2026, so rejecting them would break the contract. The warning catches a mistyped year without blocking a late-entered shift.
   - `shift-cancel-button` cancels in one click, with the reason from an adjacent select: `advance` for nurses (`no-show` shown disabled), `no-show` for agency and admin.
   - Claim buttons render only on open shifts, cancel buttons only on claimed ones.
 - **The nurse's Open shifts list (`shift-list-item`) shows open shifts only.** Her claims are under My shifts, with cancel and timesheet entry.

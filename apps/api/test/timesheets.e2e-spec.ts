@@ -62,6 +62,31 @@ describe("timesheets (e2e)", () => {
     await resetDatabase(t);
   });
 
+  afterEach(() => {
+    t.clock.reset();
+  });
+
+  /** Agency A posts a shift and nurse-1 (valid to 2027-01-01) claims it. */
+  async function claimedShift(
+    date: string,
+    startTime: string,
+    endTime: string,
+  ): Promise<string> {
+    const posted = await t
+      .http()
+      .post("/api/shifts")
+      .set(as("agency-a"))
+      .send({ role: "RN", date, startTime, endTime })
+      .expect(201);
+    const { id } = posted.body as { id: string };
+    await t
+      .http()
+      .post(`/api/shifts/${id}/claim`)
+      .set(as("nurse-1"))
+      .expect(200);
+    return id;
+  }
+
   afterAll(async () => {
     await t.close();
   });
@@ -87,6 +112,40 @@ describe("timesheets (e2e)", () => {
         entityType: "timesheet",
         entityId: timesheet.id,
         details: { shiftId: "shift-2", agencyId: "agency-a" },
+      });
+    });
+
+    it("accepts hours for a shift that has ended", async () => {
+      t.clock.set("2026-10-03T19:00:00Z");
+      expect((await submitShift2()).shiftId).toBe("shift-2");
+    });
+
+    it("answers 409 to hours for a shift that hasn't ended", async () => {
+      const shiftId = await claimedShift("2026-12-10", "07:00", "19:00");
+      t.clock.set("2026-12-10T18:59:00Z");
+      const response = await submit("nurse-1", {
+        shiftId,
+        actualStart: "07:00",
+        actualEnd: "19:00",
+      }).expect(409);
+      expect(errorOf(response)).toBe(ERROR_MESSAGES.timesheetBeforeShiftEnds);
+      expect(await list("nurse-1")).toEqual([]);
+    });
+
+    it("blocks an overnight shift until its end time the next day", async () => {
+      const shiftId = await claimedShift("2026-12-10", "19:00", "07:00");
+      const body = { shiftId, actualStart: "19:00", actualEnd: "07:00" };
+      for (const now of ["2026-12-10T23:00:00Z", "2026-12-11T06:59:00Z"]) {
+        t.clock.set(now);
+        const response = await submit("nurse-1", body).expect(409);
+        expect(errorOf(response)).toBe(ERROR_MESSAGES.timesheetBeforeShiftEnds);
+      }
+      t.clock.set("2026-12-11T07:00:00Z");
+      const response = await submit("nurse-1", body).expect(201);
+      expect(TimesheetSchema.parse(response.body)).toMatchObject({
+        shiftId,
+        date: "2026-12-10",
+        minutesWorked: 720,
       });
     });
 

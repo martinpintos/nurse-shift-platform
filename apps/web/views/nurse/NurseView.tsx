@@ -3,6 +3,7 @@
 import {
   SUCCESS_MESSAGES,
   TEST_IDS,
+  hasShiftEnded,
   timesheetMinutes,
   type CancelShiftResponse,
   type Credential,
@@ -59,6 +60,7 @@ import { createLookup } from "../../lib/lookup";
 import { useNotifications } from "../../lib/notifications";
 import { useApi, useCurrentUser } from "../../lib/session";
 import { useAction } from "../../lib/use-action";
+import { useNow } from "../../lib/use-now";
 import { useResource } from "../../lib/use-resource";
 import { CredentialsPanel, currentCredential } from "./CredentialsPanel";
 import styles from "./NurseView.module.css";
@@ -254,6 +256,8 @@ function MyShiftList({
   onCancelled: (result: CancelShiftResponse) => void;
   onTimesheetSubmitted: (timesheet: Timesheet) => void;
 }) {
+  // The API refuses hours before the shift ends; this only keeps the form out of the way.
+  const now = useNow();
   return (
     <ul className={styles.myList} aria-label="Your claimed shifts" role="list">
       {shifts.map((shift) => {
@@ -287,10 +291,16 @@ function MyShiftList({
               </p>
             ) : timesheetsReady ? (
               <>
-                <TimesheetEntryForm
-                  shift={shift}
-                  onSubmitted={onTimesheetSubmitted}
-                />
+                {hasShiftEnded(shift, now) ? (
+                  <TimesheetEntryForm
+                    shift={shift}
+                    onSubmitted={onTimesheetSubmitted}
+                  />
+                ) : (
+                  <p className={styles.timesheetPending}>
+                    You can log hours after this shift ends.
+                  </p>
+                )}
                 <div className={styles.cancelFooter}>
                   <ShiftCancelControl
                     shiftId={shift.id}

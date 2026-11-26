@@ -36,6 +36,7 @@ export const ERROR_MESSAGES = {
   shiftHasTimesheet: "Shift has a timesheet, cannot cancel",
   timesheetExists: "A timesheet was already submitted for this shift",
   timesheetAlreadyApproved: "Timesheet already approved",
+  timesheetBeforeShiftEnds: "You can submit hours after the shift ends",
 
   // 400 / 403 on uploads and timesheets
   credentialFileRequired: "A license file is required",

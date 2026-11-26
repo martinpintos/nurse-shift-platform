@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import {
   ERROR_MESSAGES,
+  hasShiftEnded,
   timesheetMinutes,
   type SubmitTimesheetRequest,
   type Timesheet,
@@ -112,11 +113,23 @@ export class TimesheetsService {
         await tx.$queryRaw`SELECT "id" FROM "Shift" WHERE "id" = ${body.shiftId} FOR UPDATE`;
         const shift = await tx.shift.findUnique({
           where: { id: body.shiftId },
-          select: { status: true, claimedById: true, agencyId: true },
+          select: {
+            status: true,
+            claimedById: true,
+            agencyId: true,
+            date: true,
+            startTime: true,
+            endTime: true,
+          },
         });
         if (!shift) throw new NotFoundException(ERROR_MESSAGES.shiftNotFound);
         if (shift.status !== "filled" || shift.claimedById !== nurse.id) {
           throw new ForbiddenException(ERROR_MESSAGES.timesheetNotYourShift);
+        }
+        // Facility wall time, no conversion: the clock's UTC fields against date + endTime.
+        const times = { ...shift, date: formatDbDate(shift.date) };
+        if (!hasShiftEnded(times, this.clock.now())) {
+          throw new ConflictException(ERROR_MESSAGES.timesheetBeforeShiftEnds);
         }
         const existing = await tx.timesheet.findUnique({
           where: {

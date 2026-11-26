@@ -24,6 +24,37 @@ export function timesheetMinutes(
   return diff > 0 ? diff : diff + MINUTES_PER_DAY;
 }
 
+/** The parts of a shift that say when it ends. */
+export interface ShiftTimes {
+  /** `YYYY-MM-DD`, facility-local. */
+  date: string;
+  /** `HH:MM`, facility-local. */
+  startTime: string;
+  /** `HH:MM`, facility-local; at or before `startTime` means the next day. */
+  endTime: string;
+}
+
+/**
+ * When a shift ends, as facility-local wall time held in a Date's UTC fields. The spec
+ * has no time zones, so there is no conversion: `2026-10-02` 19:00 to 07:00 ends at
+ * `2026-10-03T07:00Z`. An end at or before the start is the next day (overnight).
+ */
+export function shiftEndsAt(shift: ShiftTimes): Date {
+  const end = new Date(`${shift.date}T${shift.endTime}:00.000Z`);
+  if (toMinutes(shift.endTime) <= toMinutes(shift.startTime)) {
+    end.setUTCDate(end.getUTCDate() + 1);
+  }
+  return end;
+}
+
+/**
+ * Whether the shift has ended at `now`, read as facility wall time from its UTC fields
+ * (the same no-conversion rule as `shiftEndsAt`). The end minute itself counts as ended.
+ */
+export function hasShiftEnded(shift: ShiftTimes, now: Date): boolean {
+  return now.getTime() >= shiftEndsAt(shift).getTime();
+}
+
 /** POST /api/timesheets request: actual hours a nurse worked on her claimed shift. */
 export const SubmitTimesheetRequestSchema = z
   .object({

@@ -27,6 +27,16 @@ export class TestClock extends Clock {
   advance(ms: number): void {
     this.offsetMs += ms;
   }
+
+  /** Moves the clock to `iso` (it keeps ticking from there). */
+  set(iso: string): void {
+    this.offsetMs = Date.parse(iso) - Date.now();
+  }
+
+  /** Back to the real time. */
+  reset(): void {
+    this.offsetMs = 0;
+  }
 }
 
 export type SeedUserId =

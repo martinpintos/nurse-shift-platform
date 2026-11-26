@@ -20,6 +20,8 @@ import {
   TimesheetListResponseSchema,
   TimesheetSchema,
   routePath,
+  hasShiftEnded,
+  shiftEndsAt,
   timesheetMinutes,
   type AdminShift,
   type Credential,
@@ -139,6 +141,35 @@ describe("timesheets", () => {
     ["00:00", "23:59", 1439],
   ])("%s to %s is %i minutes", (start, end, minutes) => {
     expect(timesheetMinutes(start, end)).toBe(minutes);
+  });
+
+  it.each([
+    ["a day shift", "07:00", "19:00", "2026-10-03T19:00:00.000Z"],
+    ["an overnight shift", "19:00", "07:00", "2026-10-04T07:00:00.000Z"],
+    [
+      "a shift ending at midnight",
+      "16:00",
+      "00:00",
+      "2026-10-04T00:00:00.000Z",
+    ],
+  ])("%s ends at its end time, wall clock", (_, startTime, endTime, end) => {
+    expect(
+      shiftEndsAt({ date: "2026-10-03", startTime, endTime }).toISOString(),
+    ).toBe(end);
+  });
+
+  it("counts a shift as ended from its end minute, not before", () => {
+    const overnight = {
+      date: "2026-10-03",
+      startTime: "19:00",
+      endTime: "07:00",
+    };
+    expect(hasShiftEnded(overnight, new Date("2026-10-04T06:59:59.999Z"))).toBe(
+      false,
+    );
+    expect(hasShiftEnded(overnight, new Date("2026-10-04T07:00:00.000Z"))).toBe(
+      true,
+    );
   });
 
   it("rejects equal start and end times", () => {

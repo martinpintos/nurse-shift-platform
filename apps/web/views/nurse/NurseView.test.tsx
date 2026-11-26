@@ -279,6 +279,37 @@ describe("NurseView: timesheets", () => {
   });
 });
 
+describe("NurseView: timesheets before the shift ends", () => {
+  it("shows a note instead of the hours form, and keeps cancel", async () => {
+    const upcoming: Shift = {
+      ...shift2,
+      id: "shift-9",
+      date: "2099-01-01",
+    };
+    renderNurse({
+      "GET /api/shifts": { shifts: [...seedShifts, upcoming] },
+    });
+    await screen.findAllByTestId(TEST_IDS.shiftListItem);
+
+    const rows = within(myShifts()).getAllByRole("listitem");
+    const future = rows.find((row) =>
+      row.textContent?.includes("You can log hours after this shift ends."),
+    );
+    expect(future).toBeDefined();
+    expect(within(future!).queryByLabelText("Actual start")).toBeNull();
+    expect(
+      within(future!).queryByRole("button", { name: /submit timesheet/i }),
+    ).toBeNull();
+    expect(
+      within(future!).getByTestId(TEST_IDS.shiftCancelButton),
+    ).toBeTruthy();
+    // shift-2 is in the past, so its form is still there.
+    expect(
+      within(myShifts()).getAllByRole("button", { name: /submit timesheet/i }),
+    ).toHaveLength(1);
+  });
+});
+
 describe("NurseView: credentials", () => {
   const pdf = () =>
     new File(["%PDF-1.7"], "renewed-license.pdf", { type: "application/pdf" });
